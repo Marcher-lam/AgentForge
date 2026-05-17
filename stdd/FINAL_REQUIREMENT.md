@@ -254,6 +254,7 @@
 | IMPL-14 | Agentic RAG：Per-Agent ChromaDB 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索 | ✅ 已完成 |
 | IMPL-15 | RL 训练结果写回 Agent：提取策略信号（temperature/max_tokens/风格描述）→ 写回 system_prompt + LLM 参数 | ✅ 已完成 |
 | FIX-2 | WebSocket subscribe KeyError 修复 + VectorMemory 真实语义 embedding + asyncio/anyio 统一 | ✅ 已修复 |
+| IMPL-16 | 预设 AI 专家团队：启动自动创建 9 个角色（程序员/哲学家/数学家/ML/DL/RL/C++/推理/前端工程师）+ 群聊会话 | ✅ 已完成 |
 
 ### P2 — 优化项
 
