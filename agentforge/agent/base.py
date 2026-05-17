@@ -6,7 +6,7 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any
 
-import anyio
+import asyncio
 
 from agentforge.agent.events import EventEmitter
 from agentforge.types.errors import AgentInitFailed, InvalidStateTransition
@@ -20,7 +20,7 @@ class AgentBase(ABC):
         self.agent_id = agent_id or uuid.uuid4()
         self.name = name or self.__class__.__name__
         self._state = AgentState.CREATED
-        self._lock = anyio.Lock()
+        self._lock = asyncio.Lock()
         self.events = EventEmitter()
 
     @property

@@ -99,9 +99,9 @@ class MemoryManager:
                 )
 
         if "vector" in target_levels:
-            from agentforge.memory.vector_memory import _hash_embedding
+            from agentforge.memory.vector_memory import semantic_embedding
 
-            query_emb = _hash_embedding(query)
+            query_emb = semantic_embedding(query)
             v_entries = self.vector.search(
                 agent_id=agent_id, query_embedding=query_emb, top_k=top_k
             )

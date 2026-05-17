@@ -1,8 +1,7 @@
-"""NumPy-based vector memory with cosine similarity search."""
+"""NumPy-based vector memory with cosine similarity search and real semantic embeddings."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -14,30 +13,31 @@ import structlog
 
 logger = structlog.get_logger("agentforge.memory.vector")
 
-# Lazy import: numpy is optional but we keep the feature self-contained.
 _np = None
+_embed_model = None
 
 
 def _get_numpy():
     global _np
     if _np is None:
         import numpy
-
         _np = numpy
     return _np
 
 
-def _hash_embedding(text: str, dim: int = 128) -> list[float]:
-    """Deterministic pseudo-embedding from text hash. Not semantically meaningful."""
-    np = _get_numpy()
-    h = hashlib.sha256(text.encode("utf-8")).digest()
-    seed = int.from_bytes(h[:4], "little")
-    rng = np.random.default_rng(seed)
-    vec = rng.standard_normal(dim).astype(np.float32)
-    norm = np.linalg.norm(vec)
-    if norm > 0:
-        vec = vec / norm
-    return vec.tolist()
+def _get_embed_model():
+    """Lazy-load fastembed model for real semantic embeddings."""
+    global _embed_model
+    if _embed_model is None:
+        from fastembed import TextEmbedding
+        _embed_model = TextEmbedding("BAAI/bge-small-en-v1.5")
+    return _embed_model
+
+
+def semantic_embedding(text: str) -> list[float]:
+    """Generate real semantic embedding using fastembed (BAAI/bge-small-en-v1.5, 384-dim)."""
+    model = _get_embed_model()
+    return [e.tolist() for e in model.embed([text])][0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,9 +89,9 @@ class VectorMemory:
         embedding: list[float] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """Add a vector entry. Uses hash-based pseudo-embedding if none provided."""
+        """Add a vector entry. Uses real semantic embedding if none provided."""
         entry_id = str(uuid.uuid4())
-        emb = embedding if embedding is not None else _hash_embedding(text)
+        emb = embedding if embedding is not None else semantic_embedding(text)
         entry = VectorEntry(
             id=entry_id,
             agent_id=agent_id,

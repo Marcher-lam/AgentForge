@@ -52,16 +52,30 @@ class WebSocketMessageBus(InProcessMessageBus):
         self._client_subs[client_id] = []
         try:
             async for raw in websocket:
-                data = json.loads(raw)
+                try:
+                    data = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("Invalid JSON from client %s", client_id)
+                    continue
 
-                if "subscribe" in data:
+                if data.get("type") == "subscribe":
                     topic = data.get("topic", "")
+                    if not topic:
+                        logger.warning("Subscribe without topic from client %s", client_id)
+                        continue
                     sub_id = await self.subscribe(topic, lambda m, cid=client_id: self._send_to_client(cid, m))
                     self._client_subs[client_id].append(sub_id)
-                else:
+                elif data.get("type") == "unsubscribe":
+                    sub_id = data.get("subscription_id")
+                    if sub_id and sub_id in self._client_subs.get(client_id, []):
+                        await self.unsubscribe(sub_id)
+                        self._client_subs[client_id].remove(sub_id)
+                elif "message" in data:
                     msg = Message.from_json(data["message"])
                     topic = data.get("topic", msg.topic)
                     await self.publish(topic, msg)
+                else:
+                    logger.warning("Unknown frame type from client %s: %s", client_id, list(data.keys()))
         except websockets.ConnectionClosed:
             pass
         finally:
@@ -97,7 +111,7 @@ class WebSocketMessageBus(InProcessMessageBus):
                 # Re-subscribe to all stored topics
                 for topic in list(self._subscribed_topics):
                     try:
-                        await self._ws.send(json.dumps({"subscribe": True, "topic": topic}))
+                        await self._ws.send(json.dumps({"type": "subscribe", "topic": topic}))
                     except Exception:
                         logger.warning("Failed to re-subscribe to topic %s", topic)
                 # Restart heartbeat
@@ -152,7 +166,7 @@ class WebSocketMessageBus(InProcessMessageBus):
     async def ws_subscribe(self, topic: str, handler: Callable[[Message], Any]) -> str:
         """Subscribe via WebSocket and register the handler locally."""
         if self._ws:
-            await self._ws.send(json.dumps({"subscribe": True, "topic": topic}))
+            await self._ws.send(json.dumps({"type": "subscribe", "topic": topic}))
         self._subscribed_topics.add(topic)
         self._persist_subs()
         return await self.subscribe(topic, handler)

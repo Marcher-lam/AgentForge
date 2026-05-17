@@ -703,7 +703,7 @@ interface RLRun {
 
 | ID | 描述 | 影响 |
 |----|------|------|
-| BUG-1 | websocket.py subscribe 帧解析 KeyError | 跨进程订阅不可用 |
+| BUG-1 | ~~websocket.py subscribe 帧解析 KeyError~~ ✅ 已修复 | 统一帧格式 `type:"subscribe"` + 健壮解析 |
 
 ### P1 — 近期计划
 

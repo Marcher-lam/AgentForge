@@ -8,8 +8,6 @@ import uuid
 from collections import defaultdict
 from typing import Any, Callable
 
-import anyio
-
 from agentforge.bus.topic_matcher import topic_matches
 from agentforge.types.errors import MessageDecodeError, RpcTimeout, SubscriptionNotFound
 from agentforge.types.message import Message, MessageType
