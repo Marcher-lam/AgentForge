@@ -39,7 +39,7 @@
 | 进化计算 | NumPy | 轻量遗传算法 |
 | 技能系统 | SKILL.md (OpenClaw 兼容) | 标准格式，生态复用 |
 | 工具系统 | MCP 协议 + JSON Schema | 标准化工具注册 |
-| 前端 | React 19 + Jotai + Tailwind + Recharts | 响应式状态管理 + 数据可视化 |
+| 前端 | React 19 + Jotai + Tailwind + Recharts + react-markdown + KaTeX | 响应式状态管理 + 数据可视化 + Markdown/LaTeX 渲染 |
 | 测试 | pytest + vitest | 全栈 TDD |
 
 ---
@@ -483,7 +483,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 
 | Tab | 功能描述 |
 |-----|----------|
-| **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。启动自带"AI 专家团队"群聊（10 个预设角色，含个性口头禅）。支持删除会话（带确认）、导出聊天记录（JSON 下载）、群聊多 Agent 讨论 |
+| **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。现代 IM 风格 UI：渐变圆形头像（12 种角色配色）、Per-Agent 独立色调气泡、完整 Markdown 渲染（标题/代码块/表格/列表/引用）+ LaTeX 公式（KaTeX 行内 `$...$` / 块级 `$$...$$`）+ 代码语法高亮（highlight.js）。启动自带"AI 专家团队"群聊（10 个预设角色）。支持删除会话（带确认）、导出聊天记录、群聊多 Agent 讨论 |
 | **智能体** | 卡片式管理。创建时一步配齐 LLM Provider/Model + 技能 + MCP + 进化参数 + RL 参数。渐变头像、能力徽章、per-agent 配置。点击跳转对话 |
 | **监控** | 消息流监控面板。统计条（消息总数/Agent 分布）、类型筛选、自动滚动切换 |
 | **仪表盘** | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 + LTTB 大数据降采样 |

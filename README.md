@@ -7,7 +7,7 @@
 | 层 | 技术 |
 |---|------|
 | 后端 | Python 3.12+ / FastAPI / WebSocket / asyncio |
-| 前端 | React 19 + TypeScript + Vite + TailwindCSS + Recharts |
+| 前端 | React 19 + TypeScript + Vite + TailwindCSS + Recharts + react-markdown + KaTeX |
 | LLM | OpenAI 兼容 API（支持本地模型 / Anthropic / Ollama） |
 | 进化 | 遗传算法（锦标赛选择 / SBX交叉 / 高斯变异） |
 | RL | PPO / DQN / REINFORCE（NumPy 实现，真实训练） |
@@ -375,7 +375,7 @@ cd frontend && npx tsc --noEmit
 
 | Tab | 功能 |
 |-----|------|
-| 对话 | 会话列表（单聊/群聊切换 + 删除确认 + 导出记录）+ 消息面板 + WebSocket 实时通信 |
+| 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格 |
 | 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），点击跳转对话 |
 | 监控 | 消息流监控面板（统计条/类型筛选/自动滚动切换） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |

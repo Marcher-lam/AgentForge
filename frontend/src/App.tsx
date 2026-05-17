@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import 'highlight.js/styles/github-dark.css';
+import 'katex/dist/katex.min.css';
 import { Provider } from 'jotai';
 import { MessagePanel } from './components/chat/MessagePanel';
 import { ChatInput } from './components/chat/ChatInput';
