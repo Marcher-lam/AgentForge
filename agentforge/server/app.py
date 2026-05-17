@@ -638,7 +638,7 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
 
     # Hot layer: current session's compact timeline (≤800 chars)
     if chat_memory and session_id:
-        memory_context = chat_memory.get_context(session_id, agent.name, budget=800)
+        memory_context = chat_memory.get_context(session_id, agent.name, str(agent.agent_id), budget=800)
 
     # Cold layer: cross-session semantic search (≤300 chars)
     cold_context = ""
@@ -725,18 +725,15 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
                     await memory.store("vector", str(agent.agent_id), key=f"vec_{round_num}", value=reply[:400])
             except Exception:
                 pass
-        # Record to ChatMemory timeline
+        # Record to ChatMemory timeline (shared + per-agent)
         if chat_memory and session_id:
-            # Detect @mentions in reply
-            mentioned = None
-            for line in reply.split("\n"):
-                if line.startswith("@"):
-                    mentioned = line.split()[0][1:] if line.split() else None
-                    break
-            if mentioned:
-                chat_memory.record(session_id, agent.name, "@提及", reply[:60], target=mentioned)
-            else:
-                chat_memory.record(session_id, agent.name, "答", reply[:60])
+            chat_memory.record_agent_reply(
+                session_id=session_id,
+                agent_id=str(agent.agent_id),
+                agent_name=agent.name,
+                reply=reply,
+                agent_ids=list(state.agents.keys()) if hasattr(state, 'agents') else None,
+            )
         # Knowledge base: only store user-uploaded knowledge, not chat replies
         return reply
     except Exception as e:
