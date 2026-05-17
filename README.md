@@ -309,17 +309,18 @@ Per-session 双轨设计——**共享全量记忆 + Agent 独立标记**：
 
 ## Agentic RAG（知识库 + 联网搜索）
 
-每个 Agent 独立拥有 ChromaDB 知识库，聊天时遵循 Agentic RAG 范式：
+每个 Agent 独立拥有 ChromaDB 知识库（启动时自动注入 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
 
 **三阶段流程：**
-1. **记忆检索** — 从短期/长期/向量记忆检索对话历史
-2. **Agentic 决策** — LLM 自主判断是否需要检索知识库或联网搜索
+1. **记忆检索** — ChatMemory 当前会话时序（≤800 chars）+ 向量语义跨会话检索（≤300 chars）
+2. **Agentic 决策** — LLM 根据用户问题+自身角色自主判断是否需要检索知识库或联网搜索
 3. **生成回复** — 融合记忆+知识库+联网搜索+讨论记录
 
 **技术栈：**
 - ChromaDB 持久化存储，Per-Agent collection 隔离
 - fastembed (BAAI/bge-small-en-v1.5) 384维真实语义 embedding
 - DuckDuckGo 联网搜索（零外部依赖）
+- 启动时自动 seed 角色专属知识（程序员→设计模式/DevOps，RL工程师→PPO/DQN...）
 
 ```bash
 # 上传知识到 Agent
@@ -328,6 +329,9 @@ curl -X POST localhost:8000/api/agents/{id}/knowledge \
 
 # 检索知识
 curl "localhost:8000/api/agents/{id}/knowledge/search?q=关键词"
+
+# 查看知识库统计
+curl "localhost:8000/api/agents/{id}/knowledge/stats"
 ```
 - 实时训练曲线：奖励 + 损失 + 对比图（Recharts 双 Y 轴）
 

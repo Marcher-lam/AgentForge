@@ -33,7 +33,7 @@
 | Agent 核心 | Python 3.12 + asyncio | 异步原生，Protocol 接口 |
 | 消息通信 | asyncio + websockets | 进程内零拷贝 + 跨进程 WebSocket |
 | 记忆存储 | SQLite + NumPy vectors | 嵌入式、零运维、语义检索 |
-| 知识库 | ChromaDB + fastembed | Per-Agent collection, ONNX 推理, 384维语义 embedding |
+| 知识库 | ChromaDB + fastembed | Per-Agent collection, 启动时自动seed角色知识(8条/角色) |
 | 联网搜索 | DuckDuckGo HTML | 零外部依赖 |
 | RL 训练 | NumPy | 轻量数值计算，真实 PPO/DQN |
 | 进化计算 | NumPy | 轻量遗传算法 |
@@ -188,24 +188,27 @@ AgentForge/
 
 ### 4.2 Agentic RAG（知识库 + 联网搜索）
 
-每个 Agent 独立拥有 ChromaDB 知识库，聊天时遵循 Agentic RAG 范式：
+每个 Agent 独立拥有 ChromaDB 知识库（启动时自动 seed 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
 
 ```
 ┌───────────────────────────────────────────────────────┐
 │               Agentic RAG 三阶段流程                    │
 ├───────────────────────────────────────────────────────┤
-│  Stage 1 — 记忆检索                                    │
-│  从短期/长期/向量三层记忆检索对话历史                      │
+│  Stage 1 — 记忆检索 (严格预算控制)                      │
+│  热层: ChatMemory 当前会话时序 (≤800 chars)              │
+│  冷层: 向量语义跨会话检索 (≤300 chars)                   │
 │  ↓                                                     │
-│  Stage 2 — Agentic 决策（LLM 自主判断）                 │
+│  Stage 2 — Agentic 决策（LLM 根据问题+角色自主判断）     │
+│  输入: 用户原始问题 + Agent 角色信息                      │
 │  LLM 选择策略:                                         │
-│    A. 仅知识库检索                                      │
-│    B. 仅联网搜索                                        │
+│    A. 仅知识库检索 (Per-Agent ChromaDB)                  │
+│    B. 仅联网搜索 (DuckDuckGo)                           │
 │    C. 知识库 + 联网搜索                                 │
 │    D. 直接回答（不需要外部信息）                          │
 │  ↓                                                     │
 │  Stage 3 — 生成回复                                    │
-│  融合 记忆 + 知识库 + 联网搜索 + 讨论记录                │
+│  融合 system_prompt + 记忆 + RAG + 讨论记录              │
+│  总上下文 ≤4400 chars / 2200 tokens                     │
 └───────────────────────────────────────────────────────┘
 ```
 
