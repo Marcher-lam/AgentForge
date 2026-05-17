@@ -538,10 +538,13 @@ async def _check_relevance(agent, topic: str) -> bool:
     """Lightweight LLM call: does this agent find the topic relevant to its role?"""
     from agentforge.llm.protocol import LLMMessage, LLMRequest
     prompt = (
-        f"你的角色设定：「{agent.system_prompt}」\n"
-        f"讨论话题：「{topic}」\n\n"
-        f"请判断这个话题是否与你的角色和专业领域相关。\n"
-        f"只需回答 YES 或 NO，不要解释。"
+        f"你的角色：「{agent.name}」\n"
+        f"角色专长：{agent.system_prompt[:200]}\n"
+        f"用户话题：「{topic}」\n\n"
+        f"判断标准：只有当话题直接涉及你的核心专业领域时才算相关。"
+        f"泛社交话题（打招呼/闲聊/自我介绍）不算相关。"
+        f"如果话题是宽泛的通用知识问题，只有最对口的专业才回答。\n"
+        f"只回答 YES 或 NO。"
     )
     try:
         resp = await agent.llm.complete(LLMRequest(
@@ -549,7 +552,7 @@ async def _check_relevance(agent, topic: str) -> bool:
             temperature=0.0, max_tokens=8,
         ))
         answer = (resp.content or "").strip().upper()
-        return answer.startswith("YES") or "是" in answer or "相关" in answer
+        return answer.startswith("YES") or "是" in answer
     except Exception:
         return True
 
@@ -593,20 +596,21 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
         if round_num == 0:
             instruction = (
                 f"你是「{agent.name}」，以下是一场讨论的记录。\n"
-                f"请针对话题发表你的专业观点。可以直接回复用户，也可以@其他智能体讨论。\n"
-                f"要求：简洁有见地，不要重复已有观点。"
+                f"请针对话题发表你的专业观点。用你自己的风格说话，自然、拟人、有个性。\n"
+                f"可以直接回复用户，也可以@其他智能体讨论。\n"
+                f"要求：简洁有见地，不要重复已有观点，保持你角色的说话风格和口头禅。"
             )
         else:
             instruction = (
                 f"你是「{agent.name}」，讨论已经进行了一段时间。\n"
                 f"看了其他人的发言，如果你有新观点、补充、或想回应某人，请发言。\n"
-                f"如果没什么要补充的，只输出「PASS」。"
+                f"如果没什么要补充的，只输出「PASS」。保持你的角色风格。"
             )
     else:
         instruction = (
-            f"你是「{agent.name}」，这个话题不完全属于你的专业领域，但你可以旁观。\n"
-            f"如果你有独特的跨界视角或补充，简短说一句（一两句话）。\n"
-            f"如果确实没什么要说的，只输出「PASS」。"
+            f"你是「{agent.name}」，这个话题不属于你的核心专业领域。\n"
+            f"如果你确实有非常独特的跨界视角（必须是你这个角色才有的角度），简短说一两句。\n"
+            f"否则只输出「PASS」。不要强行蹭话题。"
         )
 
     # ── Phase 1: Memory recall ──
@@ -665,7 +669,7 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
                 LLMMessage(role="system", content=agent.system_prompt),
                 LLMMessage(role="user", content=f"{instruction}{memory_context}{rag_context}\n\n--- 讨论记录 ---\n{transcript}\n\n--- 你的发言 ---"),
             ],
-            temperature=_get_agent_temperature(agent), max_tokens=512 if is_relevant else 128,
+            temperature=_get_agent_temperature(agent), max_tokens=512 if is_relevant else 64,
         ))
         reply = (resp.content or "").strip()
         if reply.upper() in ("PASS", "PASS。", "PASS。", "pass"):
