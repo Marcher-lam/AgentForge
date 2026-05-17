@@ -370,7 +370,7 @@ function AppContent() {
                 </div>
               )}
               <MessagePanel messages={messages} />
-              <ChatInput onSend={handleSend} disabled={!activeSession} />
+              <ChatInput onSend={handleSend} disabled={!activeSession} agents={agents.map((a) => ({ agent_id: a.agent_id, name: a.name }))} />
             </div>
           </div>
         )}

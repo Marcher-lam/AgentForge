@@ -541,9 +541,12 @@ async def _check_relevance(agent, topic: str) -> bool:
         f"你的角色：「{agent.name}」\n"
         f"角色专长：{agent.system_prompt[:200]}\n"
         f"用户话题：「{topic}」\n\n"
-        f"判断标准：只有当话题直接涉及你的核心专业领域时才算相关。"
-        f"泛社交话题（打招呼/闲聊/自我介绍）不算相关。"
-        f"如果话题是宽泛的通用知识问题，只有最对口的专业才回答。\n"
+        f"严格判断：这个话题是否属于你的**核心专业领域**？\n"
+        f"- 必须是只有你这个角色才能给出专业回答的话题才算 YES\n"
+        f"- 泛社交（打招呼/闲聊/自我介绍）→ NO\n"
+        f"- 宽泛技术话题只有最直接相关的角色回答，其他角色 → NO\n"
+        f"- 如果换一个同样专业的角色也能回答 → NO\n"
+        f"- 宁可漏答也不要抢答别人的专业领域\n\n"
         f"只回答 YES 或 NO。"
     )
     try:
@@ -597,13 +600,16 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
             instruction = (
                 f"你是「{agent.name}」，以下是一场讨论的记录。\n"
                 f"请针对话题发表你的专业观点。用你自己的风格说话，自然、拟人、有个性。\n"
-                f"可以直接回复用户，也可以@其他智能体讨论。\n"
+                f"你可以直接回复用户，也可以@其他智能体讨论。\n"
+                f"如果你觉得问题不属于你的专业领域，但知道谁更适合回答，可以说：'这个问题我不太确定，@XXX 你应该更清楚'。\n"
+                f"如果你觉得需要其他专家补充视角，可以主动@他们参与讨论。\n"
                 f"要求：简洁有见地，不要重复已有观点，保持你角色的说话风格和口头禅。"
             )
         else:
             instruction = (
                 f"你是「{agent.name}」，讨论已经进行了一段时间。\n"
                 f"看了其他人的发言，如果你有新观点、补充、或想回应某人，请发言。\n"
+                f"你也可以@其他还未发言的专家来补充视角。\n"
                 f"如果没什么要补充的，只输出「PASS」。保持你的角色风格。"
             )
     else:
@@ -1415,6 +1421,44 @@ def create_app() -> FastAPI:
                             await state.manager.broadcast({"type": "message", "data": agent_msg})
                         continue
 
+                    # ── Check for @mentions ──
+                    mentioned_ids: list[str] = []
+                    for aid, agent in agents:
+                        if f"@{agent.name}" in content:
+                            mentioned_ids.append(aid)
+
+                    if mentioned_ids:
+                        # Direct mention mode: only mentioned agents reply, skip relevance check
+                        status_msg = {
+                            "type": "system",
+                            "data": {
+                                "message_id": str(uuid.uuid4()),
+                                "session_id": session_id,
+                                "sender_type": "SYSTEM",
+                                "sender_id": None,
+                                "sender_name": "系统",
+                                "content": f"@提及：{', '.join(state.agents[aid].name for aid in mentioned_ids)} 被点名",
+                                "content_type": "SYSTEM",
+                                "created_at": _now(),
+                            },
+                        }
+                        await state.manager.broadcast(status_msg)
+
+                        for aid in mentioned_ids:
+                            agent = state.agents.get(aid)
+                            if not agent:
+                                continue
+                            transcript = _build_transcript(state.messages.get(session_id, []))
+                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge)
+                            if reply:
+                                agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
+                                state.messages.setdefault(session_id, []).append(agent_msg)
+                                session["last_message"] = agent_msg
+                                session["updated_at"] = _now()
+                                await state.manager.broadcast({"type": "message", "data": agent_msg})
+                                await asyncio.sleep(0.3)
+                        continue
+
                     # ── Phase 1: Relevance Check (parallel) ──
                     relevance_tasks = {aid: _check_relevance(agent, content) for aid, agent in agents}
                     relevance_results = {}
@@ -1424,6 +1468,11 @@ def create_app() -> FastAPI:
 
                     relevant_ids = [aid for aid, rel in relevance_results.items() if rel]
                     observer_ids = [aid for aid, rel in relevance_results.items() if not rel]
+
+                    # Fallback: if no agent is relevant (e.g. casual greeting), pick 1-2 closest
+                    if not relevant_ids:
+                        relevant_ids = [aid for aid, _ in agents[:2]]
+                        observer_ids = [aid for aid, _ in agents[2:]]
 
                     # Broadcast relevance status
                     status_msg = {
@@ -1442,10 +1491,16 @@ def create_app() -> FastAPI:
                     await state.manager.broadcast(status_msg)
 
                     # ── Phase 2: Core Discussion (relevant agents, multi-round) ──
+                    # Track who has spoken to avoid re-triggering
+                    spoken_ids: set[str] = set()
                     max_rounds = min(3, max(2, len(relevant_ids)))
                     for round_num in range(max_rounds):
                         spoke_this_round = False
+                        newly_mentioned: list[str] = []
+
                         for aid in relevant_ids:
+                            if aid in spoken_ids and round_num > 0:
+                                continue  # skip those who already spoke unless new round invites them
                             agent = state.agents.get(aid)
                             if not agent:
                                 continue
@@ -1461,12 +1516,67 @@ def create_app() -> FastAPI:
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
                             spoke_this_round = True
+                            spoken_ids.add(aid)
 
                             await state.manager.broadcast({"type": "message", "data": agent_msg})
                             await asyncio.sleep(0.3)
 
+                            # Detect @mentions in this reply → invite those agents
+                            for other_aid, other_agent in agents:
+                                if other_aid not in relevant_ids and f"@{other_agent.name}" in reply:
+                                    newly_mentioned.append(other_aid)
+
+                        # Add newly @mentioned agents to the discussion for next rounds
+                        if newly_mentioned:
+                            for new_aid in newly_mentioned:
+                                if new_aid not in relevant_ids:
+                                    relevant_ids.append(new_aid)
+                                    if new_aid in observer_ids:
+                                        observer_ids.remove(new_aid)
+
                         if not spoke_this_round:
                             break
+
+                    # ── Phase 2.5: @mention chain — agents mentioned by others get to respond ──
+                    chain_depth = 0
+                    while chain_depth < 3:
+                        chain_mentions: list[str] = []
+                        # Check last batch of messages for new @mentions of agents who haven't spoken
+                        recent = state.messages.get(session_id, [])
+                        for msg in reversed(recent):
+                            if msg.get("sender_type") != "AGENT":
+                                continue
+                            sender_id = msg.get("sender_id")
+                            content = msg.get("content", "")
+                            for other_aid, other_agent in agents:
+                                if other_aid not in spoken_ids and f"@{other_agent.name}" in content:
+                                    if other_aid not in chain_mentions:
+                                        chain_mentions.append(other_aid)
+
+                        if not chain_mentions:
+                            break
+
+                        for aid in chain_mentions:
+                            agent = state.agents.get(aid)
+                            if not agent:
+                                continue
+
+                            transcript = _build_transcript(state.messages.get(session_id, []))
+                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge)
+
+                            if not reply:
+                                continue
+
+                            agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
+                            state.messages.setdefault(session_id, []).append(agent_msg)
+                            session["last_message"] = agent_msg
+                            session["updated_at"] = _now()
+                            spoken_ids.add(aid)
+
+                            await state.manager.broadcast({"type": "message", "data": agent_msg})
+                            await asyncio.sleep(0.3)
+
+                        chain_depth += 1
 
                     # ── Phase 3: Observer Commentary (optional) ──
                     for aid in observer_ids:
