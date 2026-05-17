@@ -252,6 +252,122 @@ def create_and_run():
     api_key = os.environ.get("LLM_API_KEY", "")
     base_url = os.environ.get("LLM_BASE_URL", "")
 
+    def _seed_knowledge(state, agent_id: str, role_name: str) -> None:
+        """Seed per-agent ChromaDB knowledge base with role-specific domain knowledge."""
+        knowledge_seeds = {
+            "程序员": [
+                "软件工程核心原则：SOLID、DRY、KISS、YAGNI",
+                "设计模式：单例、工厂、观察者、策略、装饰器模式的应用场景",
+                "系统设计基础：微服务 vs 单体、CAP定理、负载均衡策略",
+                "代码质量：单元测试、集成测试、TDD、代码审查最佳实践",
+                "性能优化：缓存策略(Redis/Memcached)、数据库索引、异步编程",
+                "DevOps实践：CI/CD流水线、Docker容器化、Kubernetes编排",
+                "API设计：RESTful规范、GraphQL、gRPC、WebSocket适用场景",
+                "版本控制：Git工作流(GitFlow/TrunkBased)、分支策略、代码合并",
+            ],
+            "哲学家": [
+                "存在主义：萨特的'存在先于本质'、海德格尔的'此在'概念",
+                "伦理学：功利主义(边沁/密尔) vs 义务论(康德) vs 美德伦理(亚里士多德)",
+                "认识论：经验主义 vs 理性主义、笛卡尔怀疑论、康德先验哲学",
+                "技术哲学：海德格尔对技术的追问、技术决定论 vs 社会建构论",
+                "东方哲学：儒家仁义礼智信、道家无为而治、禅宗顿悟",
+                "科学哲学：波普尔证伪主义、库恩范式转换、费耶阿本德认识论无政府",
+                "语言哲学：维特根斯坦语言游戏、塞尔言语行为理论",
+                "政治哲学：罗尔斯正义论、诺齐克最小国家、哈贝马斯公共领域",
+            ],
+            "数学家": [
+                "线性代数：矩阵分解(SVD/EIGEN)、向量空间、线性变换",
+                "概率论：贝叶斯定理、大数定律、中心极限定理、马尔可夫链",
+                "微积分：泰勒展开、多元函数极值、拉格朗日乘数法",
+                "数论：素数分布、模运算、费马小定理、RSA加密数学基础",
+                "拓扑学：连续映射、紧致性、连通性、同伦",
+                "实分析：测度论、Lebesgue积分、收敛定理",
+                "离散数学：图论、组合计数、递推关系、生成函数",
+                "优化理论：凸优化、梯度下降、拉格朗日对偶、KKT条件",
+            ],
+            "机器学习算法工程师": [
+                "经典算法：线性回归、逻辑回归、SVM、决策树、随机森林、XGBoost、LightGBM",
+                "特征工程：缺失值处理、特征编码(LabelEncoder/OneHot)、特征选择(卡方/互信息)",
+                "模型评估：交叉验证、AUC-ROC、F1-score、混淆矩阵、过拟合检测",
+                "集成学习：Bagging、Boosting(AdaBoost/GBDT)、Stacking、Blending",
+                "数据预处理：标准化(Z-score)、归一化(MinMax)、异常值检测、数据增强",
+                "超参调优：网格搜索、随机搜索、贝叶斯优化(Optuna)",
+                "聚类算法：K-Means、DBSCAN、层次聚类、高斯混合模型(GMM)",
+                "降维技术：PCA、t-SNE、UMAP、自编码器",
+            ],
+            "深度学习算法工程师": [
+                "基础架构：全连接层、卷积层(CNN)、循环层(RNN/LSTM/GRU)、注意力机制",
+                "Transformer：自注意力、多头注意力、位置编码、Encoder-Decoder架构",
+                "训练技巧：学习率调度(Cosine/Warmup)、梯度裁剪、混合精度训练",
+                "正则化：Dropout、BatchNorm、LayerNorm、Weight Decay、数据增强",
+                "损失函数：交叉熵、Focal Loss、对比学习(InfoNCE)、KL散度",
+                "优化器：SGD+Momentum、Adam、AdamW、Lion",
+                "生成模型：VAE、GAN、Diffusion Model(DDPM/DDIM)、Flow",
+                "大语言模型：预训练、SFT、RLHF、LoRA/QLoRA微调、推理加速",
+            ],
+            "强化学习算法工程师": [
+                "基础概念：MDP、策略π、价值函数V/Q、贝尔曼方程",
+                "PPO算法：Actor-Critic架构、GAE优势估计、PPO-Clip目标函数",
+                "DQN算法：经验回放、目标网络、ε-greedy探索、Double DQN",
+                "REINFORCE：策略梯度定理、基线减方差、蒙特卡洛采样",
+                "奖励设计：稀疏奖励、奖励塑形、逆强化学习(IRL)、RLHF",
+                "探索策略：UCB、Thompson Sampling、好奇心驱动(ICM/RND)",
+                "多智能体RL：独立学习、集中式训练分布式执行(CTDE)、通信学习",
+                "离线RL：Conservative Q-Learning、BCQ、Decision Transformer",
+            ],
+            "C++工程师": [
+                "现代C++：C++17/20新特性(structured bindings、concepts、ranges、coroutines)",
+                "内存管理：RAII、智能指针(unique_ptr/shared_ptr/weak_ptr)、内存池",
+                "并发编程：std::thread、mutex、atomic、lock-free数据结构、线程池",
+                "模板元编程：SFINAE、Concepts、变参模板、CRTP模式",
+                "STL深度：容器选择策略、迭代器失效规则、移动语义、完美转发",
+                "性能优化：缓存友好设计、False Sharing、分支预测、SIMD向量化",
+                "构建工具：CMake、Bazel、vcpkg/Conan包管理、模块(C++20 Modules)",
+                "零成本抽象：编译期计算(constexpr)、模板特化、内联、编译器优化提示",
+            ],
+            "大模型引擎推理工程师": [
+                "推理加速：KV Cache原理、PagedAttention(vLLM)、连续批处理(Continuous Batching)",
+                "量化技术：INT8/INT4量化、GPTQ、AWQ、GGUF格式、混合精度推理",
+                "模型压缩：知识蒸馏、剪枝(结构化/非结构化)、低秩分解",
+                "并行策略：张量并行(TP)、流水线并行(PP)、数据并行(DP)、ZeRO优化",
+                "显存优化：梯度检查点、FlashAttention、显存碎片管理",
+                "服务部署：TensorRT-LLM、vLLM、TGI、Triton Inference Server",
+                "采样策略：Temperature、Top-K、Top-P、Beam Search、Repetition Penalty",
+                "长序列优化：RoPE外推、ALiBi位置编码、滑动窗口注意力、稀疏注意力",
+            ],
+            "前端工程师": [
+                "框架生态：React 19(Server Components/Actions)、Vue 3(Composition API)、Angular Signals",
+                "构建工具：Vite(ESM原生导入)、Turbopack、esbuild、Rollup",
+                "状态管理：React Context + useReducer、Zotai/Jotai、Pinia、Zustand",
+                "性能优化：代码分割(lazy/Suspense)、虚拟列表、Web Worker、SSR/SSG/ISR",
+                "CSS方案：Tailwind CSS、CSS Modules、CSS-in-JS(Styled Components/Emotion)",
+                "TypeScript：泛型约束、条件类型、映射类型、装饰器、类型体操",
+                "工程化：ESLint + Prettier、Husky Git Hooks、Monorepo(Turborepo/Nx)",
+                "测试：Vitest、React Testing Library、Playwright E2E、Storybook组件文档",
+            ],
+            "产品经理": [
+                "需求分析：用户故事地图、Jobs-to-be-Done框架、KANO模型",
+                "产品设计：MVP原则、用户旅程地图、信息架构、交互设计原则",
+                "数据驱动：A/B测试设计、漏斗分析、留存分析、北极星指标",
+                "项目管理：敏捷Scrum、看板方法、优先级矩阵(RICE/ICE)、PRD编写",
+                "用户研究：用户访谈、问卷调查、可用性测试、画像构建",
+                "商业模式：Lean Canvas、产品市场匹配(PMF)、增长黑客(AARRR)",
+                "竞品分析：SWOT分析、功能对比矩阵、差异化定位策略",
+                "团队协作：需求评审、跨部门沟通、OKR目标管理、决策文档",
+            ],
+        }
+        texts = knowledge_seeds.get(role_name, [])
+        if texts and hasattr(state, 'knowledge') and state.knowledge:
+            try:
+                state.knowledge.add(
+                    agent_id,
+                    texts=texts,
+                    metas=[{"source": "role_seed", "role": role_name} for _ in texts],
+                    ids=[f"seed_{role_name}_{i}" for i in range(len(texts))],
+                )
+            except Exception:
+                pass
+
     state.llm_config = {
         "provider": provider,
         "model": model,
@@ -293,6 +409,9 @@ def create_and_run():
             agent_config = _parse_agent_config(cfg_data)
             state.agent_configs[aid] = agent_config
             agent._agent_config = agent_config
+
+            # Seed per-agent knowledge base with role-specific domain knowledge
+            _seed_knowledge(state, aid, preset["name"])
 
         # Create a default group session with all agents
         all_ids = list(state.agents.keys())
