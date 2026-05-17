@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evolution-genome",
+  "title": "EvolutionGenome",
+  "description": "Unified genome schema supporting binary, real, and tree encodings",
+  "oneOf": [
+    {
+      "title": "BinaryGenome",
+      "type": "object",
+      "properties": {
+        "type": { "const": "binary" },
+        "genes": { "type": "array", "items": { "type": "boolean" } },
+        "fitness": { "type": ["number", "null"] }
+      },
+      "required": ["type", "genes"]
+    },
+    {
+      "title": "RealGenome",
+      "type": "object",
+      "properties": {
+        "type": { "const": "real" },
+        "genes": { "type": "array", "items": { "type": "number" } },
+        "bounds": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2, "maxItems": 2
+          }
+        },
+        "fitness": { "type": ["number", "null"] }
+      },
+      "required": ["type", "genes"]
+    },
+    {
+      "title": "TreeGenome",
+      "type": "object",
+      "properties": {
+        "type": { "const": "tree" },
+        "root": { "$ref": "#/$defs/TreeNode" },
+        "max_depth": { "type": "integer", "minimum": 1 },
+        "fitness": { "type": ["number", "null"] }
+      },
+      "required": ["type", "root"]
+    }
+  ],
+  "$defs": {
+    "TreeNode": {
+      "type": "object",
+      "properties": {
+        "value": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "children": { "type": "array", "items": { "$ref": "#/$defs/TreeNode" } }
+      },
+      "required": ["value"]
+    }
+  }
+}

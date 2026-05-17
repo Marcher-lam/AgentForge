@@ -1,0 +1,231 @@
+{
+  "consumer": { "name": "evorl-orchestrator" },
+  "provider": { "name": "evolution-engine" },
+  "interactions": [
+    {
+      "description": "Orchestrator creates EvolutionEngine with fitness_fn and callbacks for HPO",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "EvolutionEngine constructor available" }],
+      "request": {
+        "method": "CREATE",
+        "body": {
+          "constructor_args": {
+            "fitness_fn": "Callable[[list[Any]], list[float]]",
+            "selection_fn": "tournament_selection",
+            "crossover_fn": "uniform_crossover",
+            "mutation_fn": "gaussian_mutation",
+            "mutation_rate": 0.1,
+            "crossover_rate": 0.8,
+            "elite_size": 2,
+            "termination": {
+              "max_generations": 100,
+              "fitness_threshold": 0.95,
+              "convergence_generations": 10
+            },
+            "seed": 42
+          }
+        },
+        "matchingRules": {
+          "$.body.constructor_args.mutation_rate": { "matchers": [{ "match": "type" }] },
+          "$.body.constructor_args.crossover_rate": { "matchers": [{ "match": "type" }] },
+          "$.body.constructor_args.elite_size": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.constructor_args.seed": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      },
+      "response": {
+        "body": {
+          "instance": "EvolutionEngine",
+          "generation": 0,
+          "history": [],
+          "termination_reason": null
+        }
+      }
+    },
+    {
+      "description": "Orchestrator runs evolve() with a RealGenome population for HPO",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "Population of 50 RealGenomes initialized" }],
+      "request": {
+        "method": "EVOLVE",
+        "body": {
+          "population": {
+            "genome_type": "real",
+            "population_size": 50,
+            "genome_length": 10,
+            "bounds": [[0.0001, 0.01], [32, 16384], [8, 4096], [0.9, 0.999], [0.8, 1.0], [0.05, 0.5], [0.0, 0.1], [1, 50], [8, 512], [8, 512]]
+          }
+        }
+      },
+      "response": {
+        "body": {
+          "evolved_population": {
+            "size": 50,
+            "best_fitness": 475.0,
+            "best_individual_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "stats": {
+              "best": 475.0,
+              "mean": 310.5,
+              "worst": 45.0,
+              "std": 95.2,
+              "diversity": 0.35
+            }
+          },
+          "generations_run": 42,
+          "termination_reason": "FITNESS_THRESHOLD",
+          "history_length": 42
+        },
+        "matchingRules": {
+          "$.body.evolved_population.size": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.evolved_population.best_fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.termination_reason": { "matchers": [{ "match": "regex", "regex": "^(MAX_GENERATIONS|FITNESS_THRESHOLD|CONVERGENCE)$" }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator receives on_generation_end callback with GenerationStats",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "generation 10 completed" }],
+      "request": {
+        "method": "CALLBACK",
+        "body": {
+          "callback_type": "on_generation_end"
+        }
+      },
+      "response": {
+        "body": {
+          "generation": 10,
+          "best_fitness": 0.92,
+          "mean_fitness": 0.78,
+          "std_fitness": 0.05,
+          "diversity": 0.35,
+          "best_individual_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "timestamp": "2026-05-15T18:05:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.generation": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.best_fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.mean_fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.std_fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.diversity": { "matchers": [{ "match": "type" }] },
+          "$.body.best_individual_id": { "matchers": [{ "match": "regex", "regex": "^[0-9a-f-]{36}$" }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator receives on_termination callback",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "evolution terminated" }],
+      "request": {
+        "method": "CALLBACK",
+        "body": {
+          "callback_type": "on_termination"
+        }
+      },
+      "response": {
+        "body": {
+          "reason": "FITNESS_THRESHOLD",
+          "final_generation": 42,
+          "best_fitness": 0.96,
+          "mean_fitness": 0.89,
+          "std_fitness": 0.03,
+          "diversity": 0.15,
+          "best_individual_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "timestamp": "2026-05-15T19:00:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.reason": { "matchers": [{ "match": "regex", "regex": "^(MAX_GENERATIONS|FITNESS_THRESHOLD|CONVERGENCE)$" }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator receives on_evaluation callback after population fitness evaluation",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "population evaluation completed" }],
+      "request": {
+        "method": "CALLBACK",
+        "body": {
+          "callback_type": "on_evaluation"
+        }
+      },
+      "response": {
+        "body": {
+          "population_size": 50,
+          "fitnesses": [0.92, 0.88, 0.85, 0.82, 0.80],
+          "best_fitness": 0.92,
+          "worst_fitness": 0.15,
+          "mean_fitness": 0.65
+        },
+        "matchingRules": {
+          "$.body.population_size": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.fitnesses": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "TerminationCriteria.should_terminate returns true for fitness_threshold",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "TerminationCriteria with fitness_threshold=0.95" }],
+      "request": {
+        "method": "SHOULD_TERMINATE",
+        "body": {
+          "generation": 42,
+          "best_fitness": 0.96
+        }
+      },
+      "response": {
+        "body": {
+          "terminate": true,
+          "reason": "FITNESS_THRESHOLD"
+        }
+      }
+    },
+    {
+      "description": "TerminationCriteria.should_terminate returns false before threshold",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "TerminationCriteria with fitness_threshold=0.95" }],
+      "request": {
+        "method": "SHOULD_TERMINATE",
+        "body": {
+          "generation": 10,
+          "best_fitness": 0.78
+        }
+      },
+      "response": {
+        "body": {
+          "terminate": false,
+          "reason": ""
+        }
+      }
+    },
+    {
+      "description": "Population.stats() returns population statistics",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "Population with evaluated individuals" }],
+      "request": {
+        "method": "POPULATION_STATS",
+        "body": {
+          "population_size": 50
+        }
+      },
+      "response": {
+        "body": {
+          "best": 475.0,
+          "mean": 310.5,
+          "worst": 45.0,
+          "std": 95.2,
+          "diversity": 0.35
+        },
+        "matchingRules": {
+          "$.body.best": { "matchers": [{ "match": "type" }] },
+          "$.body.diversity": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:00:00Z",
+    "provider_version": "1.0.0",
+    "description": "EvoRL orchestrator consumes evolution-engine: creates engine, runs evolve, receives callbacks, checks termination, gets population stats."
+  }
+}

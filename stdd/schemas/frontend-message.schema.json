@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "frontend-message",
+  "title": "FrontendMessage",
+  "description": "Chat message displayed in the frontend UI",
+  "type": "object",
+  "properties": {
+    "message_id": { "type": "string", "format": "uuid" },
+    "session_id": { "type": "string", "format": "uuid" },
+    "sender_type": { "type": "string", "enum": ["USER", "AGENT", "SYSTEM"] },
+    "sender_id": { "type": ["string", "null"] },
+    "sender_name": { "type": "string", "minLength": 1 },
+    "content": { "type": "string" },
+    "content_type": {
+      "type": "string",
+      "enum": ["TEXT", "MARKDOWN", "CODE", "IMAGE", "FILE", "SYSTEM"]
+    },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["message_id", "session_id", "sender_type", "sender_name", "content", "content_type", "created_at"],
+  "additionalProperties": false
+}

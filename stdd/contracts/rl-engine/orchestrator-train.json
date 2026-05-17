@@ -1,0 +1,231 @@
+{
+  "consumer": { "name": "evorl-orchestrator" },
+  "provider": { "name": "rl-engine" },
+  "interactions": [
+    {
+      "description": "Orchestrator creates PPOTrainer with decoded hyperparams and runs training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "GymWrapper wraps CartPole-v1 for PPO" }],
+      "request": {
+        "method": "TRAIN_PPO",
+        "body": {
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "config": {
+            "learning_rate": 0.0003,
+            "n_steps": 2048,
+            "batch_size": 64,
+            "epochs": 10,
+            "gamma": 0.99,
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "entropy_coef": 0.01,
+            "hidden_layers": [256, 256]
+          },
+          "max_steps": 10000,
+          "seed": 42,
+          "continuous": false
+        },
+        "matchingRules": {
+          "$.body.config.learning_rate": { "matchers": [{ "match": "type" }] },
+          "$.body.config.gamma": { "matchers": [{ "match": "type" }] },
+          "$.body.max_steps": { "matchers": [{ "match": "integer", "min": 100 }] }
+        }
+      },
+      "response": {
+        "body": {
+          "total_steps": 10000,
+          "episodes": 47,
+          "updates": 4
+        },
+        "matchingRules": {
+          "$.body.total_steps": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.episodes": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.updates": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator creates DQNTrainer with decoded hyperparams and runs training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "GymWrapper wraps CartPole-v1 for DQN" }],
+      "request": {
+        "method": "TRAIN_DQN",
+        "body": {
+          "algorithm": "DQN",
+          "env_id": "CartPole-v1",
+          "config": {
+            "learning_rate": 0.001,
+            "buffer_size": 100000,
+            "batch_size": 64,
+            "gamma": 0.99,
+            "target_update_freq": 1000,
+            "target_update_type": "hard",
+            "tau": 0.005,
+            "epsilon_start": 1.0,
+            "epsilon_end": 0.01,
+            "epsilon_decay_steps": 50000,
+            "dueling": true,
+            "hidden_layers": [256, 256]
+          },
+          "max_steps": 10000,
+          "seed": 42
+        },
+        "matchingRules": {
+          "$.body.config.buffer_size": { "matchers": [{ "match": "integer", "min": 1000 }] },
+          "$.body.config.dueling": { "matchers": [{ "match": "type" }] }
+        }
+      },
+      "response": {
+        "body": {
+          "total_steps": 10000,
+          "episodes": 85
+        },
+        "matchingRules": {
+          "$.body.total_steps": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.episodes": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator registers EpisodeInfo callback and receives per-episode rewards",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "PPOTrainer running with episode callback" }],
+      "request": {
+        "method": "REGISTER_CALLBACK",
+        "body": {
+          "callback_type": "on_episode_end"
+        }
+      },
+      "response": {
+        "body": {
+          "episode": 1,
+          "total_reward": 21.0,
+          "length": 21
+        },
+        "matchingRules": {
+          "$.body.episode": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.total_reward": { "matchers": [{ "match": "type" }] },
+          "$.body.length": { "matchers": [{ "match": "integer", "min": 1 }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator registers StepInfo callback for training progress",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "DQNTrainer running with step callback" }],
+      "request": {
+        "method": "REGISTER_CALLBACK",
+        "body": {
+          "callback_type": "on_step_end"
+        }
+      },
+      "response": {
+        "body": {
+          "step": 1000,
+          "reward": 1.0,
+          "loss": 0.45,
+          "epsilon": 0.82,
+          "entropy": null
+        },
+        "matchingRules": {
+          "$.body.step": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.reward": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator registers UpdateInfo callback for PPO loss tracking",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "PPOTrainer completed an update" }],
+      "request": {
+        "method": "REGISTER_CALLBACK",
+        "body": {
+          "callback_type": "on_update_end"
+        }
+      },
+      "response": {
+        "body": {
+          "update": 1,
+          "loss_dict": {
+            "policy_loss": 0.12,
+            "value_loss": 0.34,
+            "entropy": 1.85,
+            "clip_fraction": 0.08
+          }
+        },
+        "matchingRules": {
+          "$.body.update": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.loss_dict": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Orchestrator saves and loads checkpoint for training resume",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "PPOTrainer has trained 10000 steps" }],
+      "request": {
+        "method": "CHECKPOINT",
+        "body": {
+          "action": "save",
+          "path": "/checkpoints/ppo_cartpole_step10000.pt"
+        }
+      },
+      "response": {
+        "body": {
+          "saved": true,
+          "path": "/checkpoints/ppo_cartpole_step10000.pt"
+        }
+      }
+    },
+    {
+      "description": "Orchestrator gets environment observation and action space for network sizing",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "GymWrapper created for CartPole-v1" }],
+      "request": {
+        "method": "ENV_INFO",
+        "body": {
+          "env_id": "CartPole-v1"
+        }
+      },
+      "response": {
+        "body": {
+          "observation_space": { "shape": [4], "dtype": "float32" },
+          "action_space": { "type": "Discrete", "n": 2 }
+        },
+        "matchingRules": {
+          "$.body.action_space.type": { "matchers": [{ "match": "regex", "regex": "^(Discrete|Box)$" }] }
+        }
+      }
+    },
+    {
+      "description": "DQNTrainer epsilon property decays linearly during training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "DQNTrainer at step 25000 of 50000 decay" }],
+      "request": {
+        "method": "GET_EPSILON",
+        "body": {
+          "algorithm": "DQN"
+        }
+      },
+      "response": {
+        "body": {
+          "epsilon": 0.505,
+          "epsilon_start": 1.0,
+          "epsilon_end": 0.01,
+          "epsilon_decay_steps": 50000,
+          "current_step": 25000
+        },
+        "matchingRules": {
+          "$.body.epsilon": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:30:00Z",
+    "provider_version": "1.0.0",
+    "description": "EvoRL orchestrator consumes rl-engine: creates PPO/DQN trainers, runs training, receives callbacks, manages checkpoints, queries env spaces and epsilon."
+  }
+}

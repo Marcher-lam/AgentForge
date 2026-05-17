@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-message",
+  "title": "AgentMessage",
+  "description": "Inter-agent message with topic routing and correlation tracking",
+  "type": "object",
+  "properties": {
+    "message_id": { "type": "string", "format": "uuid" },
+    "topic": { "type": "string", "minLength": 1 },
+    "message_type": {
+      "type": "string",
+      "enum": ["text", "json", "binary", "tool_call", "tool_result", "system", "delivery_failed"]
+    },
+    "sender_id": { "type": "string", "format": "uuid" },
+    "payload": { "type": "object", "additionalProperties": true },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": ["string", "null"], "format": "uuid" }
+  },
+  "required": ["message_id", "topic", "message_type", "sender_id", "timestamp"],
+  "additionalProperties": false
+}

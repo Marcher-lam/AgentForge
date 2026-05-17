@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-05-15T21:44:00.187027",
+  "project": "agent-core",
+  "dimensions": {
+    "bdd_format": {
+      "status": "PASS",
+      "diagnostics": [
+        {
+          "file": "stdd/changes/change-20260515-090534/specs/03-mcp-adapter.md",
+          "line": 17,
+          "severity": "warning",
+          "rule": "BDD-004",
+          "message": "Scenario may lack Then/assertion steps"
+        },
+        {
+          "file": "stdd/changes/change-20260515-090534/specs/03-mcp-adapter.md",
+          "line": 94,
+          "severity": "warning",
+          "rule": "BDD-004",
+          "message": "Scenario may lack Then/assertion steps"
+        },
+        {
+          "file": "stdd/changes/change-20260515-090534/specs/03-mcp-adapter.md",
+          "line": 213,
+          "severity": "warning",
+          "rule": "BDD-004",
+          "message": "Scenario may lack Then/assertion steps"
+        }
+      ]
+    },
+    "rfc2119": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "impl_leakage": {
+      "status": "PASS",
+      "diagnostics": [
+        {
+          "file": "stdd/changes/change-20260515-090534/specs/00-core-types.md",
+          "line": 212,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "Possible implementation leakage: dataclass (impl type) in line: - [ ] 所有 dataclass 使用 `不可变类型（frozen, slots）` 确保不可变"
+        }
+      ]
+    },
+    "placeholders": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "conflicts": {
+      "status": "PASS",
+      "diagnostics": [
+        {
+          "file": "stdd/changes/change-20260515-091942-core/specs/api-spec.yaml",
+          "line": 0,
+          "severity": "warning",
+          "rule": "CONFLICT-001",
+          "message": "api-spec.yaml AgentState has CREATED+INITIALIZED but core types spec defines INIT. States mismatch across specs."
+        },
+        {
+          "file": "api-spec.yaml vs 00-core-types.md",
+          "line": 0,
+          "severity": "warning",
+          "rule": "CONFLICT-002",
+          "message": "MessageType enum mismatch: core types define [COMMAND,EVENT,QUERY,RESPONSE,ERROR] but api-spec.yaml defines [TEXT,JSON,BINARY,TOOL_CALL,TOOL_RESULT,SYSTEM,DELIVERY_FAILED]"
+        }
+      ]
+    }
+  },
+  "total_diagnostics": 6,
+  "blocking": 0,
+  "warnings": 6,
+  "suggestions": 0
+}

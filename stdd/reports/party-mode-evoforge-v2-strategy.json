@@ -1,0 +1,92 @@
+{
+  "meta": {
+    "type": "party-mode-debate",
+    "topic": "EvoForge v2 策略：6 个工作流先做哪个？",
+    "participants": ["po", "architect", "developer", "qalead"],
+    "date": "2026-05-16",
+    "prp_ref": "stdd/prp/prp-20260516-evoforge-v2.md"
+  },
+  "debate": {
+    "round_1_opening_positions": {
+      "po": {
+        "stance": "用户价值驱动，先做 NSGA-II + 并行评估",
+        "argument": "从用户视角看，EvoForge v1 最大的两个痛点是：(1) 多目标优化只能加权求和，权重难调、结果不可靠；(2) 大种群训练时间过长。NSGA-II 直接解决痛点(1)，并行评估直接解决痛点(2)。终止策略重构是内部技术债，用户感知不到。Island 模型和自适应算子是锦上添花。所以优先级应该是：NSGA-II > 并行评估 > Island > 自适应算子 > 终止重构。",
+        "priority_order": ["NSGA-II", "Parallel Eval", "Island", "Adaptive Ops", "Termination Refactor"],
+        "estimated_user_impact": "NSGA-II: HIGH | Parallel: HIGH | Island: MEDIUM | Adaptive: LOW | Termination: NONE(user-facing)"
+      },
+      "architect": {
+        "stance": "先还技术债，再叠加能力",
+        "argument": "当前 termination.py CC=12、crossover 覆盖率 57%、Population 扩展性差。如果不在 NSGA-II 之前先重构终止策略和 Population，NSGA-II 的代码会堆在不稳固的地基上。特别是 Population 需要扩展 rank/crowding_distance 属性——如果先做 NSGA-II 再改 Population，会面临大规模返工。正确顺序：先重构基础（Termination + Population + crossover 测试）→ NSGA-II → 并行评估 → Island → 自适应。技术债清零后再叠加能力，每次变更的 regression risk 最小。",
+        "priority_order": ["Termination Refactor", "Population Extension", "crossover Tests", "NSGA-II", "Parallel Eval", "Island", "Adaptive Ops"],
+        "risk_if_wrong_order": "NSGA-II 先行 → Population 返工 → 并行在错误 Population 接口上实现 → 连锁返工"
+      },
+      "developer": {
+        "stance": "并行评估 ROI 最高，而且最独立",
+        "argument": "看数据：PRP 预估 NSGA-II 4h、并行评估 3h、Island 3h。但并行评估的影响面最大——它不仅加速进化计算，还能加速 RL 训练中的 rollout 评估。而且 ParallelFitnessEvaluator 是一个包装器，不影响任何现有代码，回归风险最低。NSGA-II 需要改 Population 数据结构、选择算子、fitness 接口——影响面大。并行评估是 3 小时就能交付且立刻产生价值的工作。优先级：并行评估 > 终止重构 > NSGA-II > Island > 自适应。",
+        "priority_order": ["Parallel Eval", "Termination Refactor", "NSGA-II", "Island", "Adaptive Ops"],
+        "key_insight": "Parallel Eval 是唯一一个 0 依赖、0 regression risk、3h 可交付的工作项"
+      },
+      "qalead": {
+        "stance": "先补测试覆盖，再动任何代码",
+        "argument": "当前 crossover.py 57%、tree.py 78%、termination.py 76%。在覆盖率如此低的情况下做大规模重构，等于蒙着眼睛走钢丝。任何重构都必须先有足够的测试保护。特别是 Island 模型和并行评估——这两个涉及并发/进程间通信，没有坚实的测试基础根本无法验证正确性。我的要求：先补齐 crossover 到 85% + termination 到 90% + tree 到 90%，再做任何 v2 工作。这大约需要 2-3h。终止策略重构本身也是测试改善的机会。顺序：测试补齐 → 终止重构 → NSGA-II → 并行 → Island → 自适应。",
+        "priority_order": ["Test Coverage (crossover+termination+tree)", "Termination Refactor", "NSGA-II", "Parallel Eval", "Island", "Adaptive Ops"],
+        "blocking_concern": "57% crossover coverage = 近一半交叉算子代码未被验证。在此基础上做 NSGA-II 的交叉扩展是自杀行为。"
+      }
+    },
+    "round_2_cross_examination": {
+      "po_challenges_architect": "终止策略重构用户完全感知不到，为什么要优先于用户急需的 NSGA-II？",
+      "architect_response": "NSGA-II 的非支配排序需要 Population 支持 rank + crowding_distance 属性。如果 Population 接口不稳定，NSGA-II 的实现会反复修改。终止重构是 Population 接口稳定的信号——如果连终止策略都拆不清楚，Population 扩展更做不好。",
+      "developer_challenges_qalead": "2-3h 补测试期间什么都不做？这会延迟功能交付。",
+      "qalead_response": "3h 测试补齐是保险费。没有这 3h，后续 16h 的重构一旦出 bug，debug 时间远超 3h。crossover 57% 意味着 sbx_crossover 和 multi_point_crossover 有未测试的分支——你能确定它们的边界条件正确吗？",
+      "developer_concedes": "确实不确定。sbx_crossover 的边界 case（单点、空基因）没有测试覆盖。QA 说的有道理。",
+      "architect_challenges_developer": "并行评估的 ProcessPoolExecutor 需要 pickle 序列化 genome 对象。RealGenome 和 BinaryGenome 用了 numpy ndarray，pickle 序列化有效率问题。你考虑过吗？",
+      "developer_response": "ndarray 的 pickle 序列化比 JSON 快 5-10x，反而是优势。但 TreeGenome 有 TreeNode 递归引用，可能有问题。可以先对 RealGenome/BinaryGenome 做并行，TreeGenome 回退串行。"
+    },
+    "round_3_resolution": {
+      "consensus": "分两阶段，测试先行，并行推进",
+      "phase_1_foundation": {
+        "duration": "3h",
+        "items": [
+          "补齐 crossover 测试 → 85% (QA lead, 1h)",
+          "补齐 termination 测试 → 90% (QA lead, 0.5h)",
+          "补齐 tree 测试 → 90% (QA lead, 0.5h)",
+          "终止策略模式重构 (Architect + Dev, 1.5h, 与测试并行)"
+        ],
+        "gate": "覆盖率 ≥ 90% + 终止重构完成 + 全部 43 现有测试通过"
+      },
+      "phase_2_capabilities": {
+        "parallel_track_A": {
+          "owner": "Developer",
+          "work": "并行适应度评估 (3h) → Island 迁移模型 (3h)",
+          "rationale": "并行评估 0 依赖、低风险、高 ROI"
+        },
+        "parallel_track_B": {
+          "owner": "Architect",
+          "work": "NSGA-II 多目标优化 (4h) → 自适应算子选择 (2h)",
+          "rationale": "NSGA-II 依赖 Phase 1 的 Population 扩展，但与 Track A 无依赖"
+        }
+      },
+      "phase_3_integration": {
+        "duration": "2h",
+        "items": ["集成测试", "ZDT1/DTLZ2 基准验证", "性能回归测试"],
+        "gate": "PRP 全部 18 项验收标准通过"
+      }
+    },
+    "final_priority_order": [
+      {"rank": 1, "item": "Test Coverage 补齐 (crossover+termination+tree)", "hours": 2, "role": "QA Lead"},
+      {"rank": 2, "item": "Termination Strategy Refactor", "hours": 1.5, "role": "Architect+Dev"},
+      {"rank": 3, "item": "Parallel Fitness Eval (Track A)", "hours": 3, "role": "Developer"},
+      {"rank": 4, "item": "NSGA-II (Track B, parallel with Track A)", "hours": 4, "role": "Architect"},
+      {"rank": 5, "item": "Island Migration (Track A)", "hours": 3, "role": "Developer"},
+      {"rank": 6, "item": "Adaptive Operator Selection (Track B)", "hours": 2, "role": "Architect"},
+      {"rank": 7, "item": "Integration + Benchmarks", "hours": 2, "role": "All"}
+    ]
+  },
+  "decision_log": [
+    "PO 原始主张：NSGA-II 优先 → 被 QA 的覆盖率数据说服，同意测试先行",
+    "Architect 原始主张：终止重构优先 → PO 接受，但要求与测试并行而非串行",
+    "Developer 原始主张：并行评估优先 → Architect 指出 TreeGenome pickle 问题，Developer 接受先对 Real/Binary 做并行",
+    "QA Lead 原始主张：测试补齐优先 → 全员同意，但 PO 要求控制在 3h 内不阻塞功能开发",
+    "最终共识：Phase 1 (3h) 测试+重构 → Phase 2 (12h) 双 Track 并行 → Phase 3 (2h) 集成"
+  ]
+}

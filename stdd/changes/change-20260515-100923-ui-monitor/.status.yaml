@@ -1,0 +1,24 @@
+change_id: "change-20260515-100923-ui-monitor"
+title: "Agent Communication Monitor"
+type: feature
+status: archived
+created: "2026-05-15T10:09:23"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - monitor.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 80

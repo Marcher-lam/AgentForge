@@ -1,0 +1,121 @@
+{
+  "consumer": { "name": "frontend-ui" },
+  "provider": { "name": "rl-engine" },
+  "interactions": [
+    {
+      "description": "Frontend receives RL training progress for dashboard metrics rendering",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "PPOTrainer running on CartPole-v1" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "rl.training.progress"
+        }
+      },
+      "response": {
+        "body": {
+          "task_id": "task-rl-001",
+          "algorithm": "PPO",
+          "current_step": 1000,
+          "current_episode": 5,
+          "status": "running",
+          "metrics": {
+            "reward": [{ "x": 100, "y": 50.0 }, { "x": 500, "y": 120.5 }, { "x": 1000, "y": 195.0 }],
+            "loss": [{ "x": 2048, "y": 0.85 }, { "x": 4096, "y": 0.42 }],
+            "entropy": [{ "x": 2048, "y": 2.1 }, { "x": 4096, "y": 1.7 }]
+          },
+          "hyperparameters": {
+            "learning_rate": 0.0003,
+            "gamma": 0.99,
+            "batch_size": 64,
+            "epochs": 10,
+            "clip_range": 0.2
+          },
+          "downsampled": false
+        },
+        "matchingRules": {
+          "$.body.algorithm": { "matchers": [{ "match": "regex", "regex": "^(PPO|DQN|MADDPG)$" }] },
+          "$.body.status": { "matchers": [{ "match": "regex", "regex": "^(running|completed|failed)$" }] },
+          "$.body.current_step": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.metrics": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives DQN training with epsilon decay curve",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "DQNTrainer running with epsilon decay" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "rl.training.progress"
+        }
+      },
+      "response": {
+        "body": {
+          "task_id": "task-rl-002",
+          "algorithm": "DQN",
+          "current_step": 25000,
+          "current_episode": 150,
+          "status": "running",
+          "metrics": {
+            "reward": [{ "x": 10000, "y": 45.0 }, { "x": 25000, "y": 150.0 }],
+            "epsilon": [{ "x": 0, "y": 1.0 }, { "x": 25000, "y": 0.505 }, { "x": 50000, "y": 0.01 }]
+          },
+          "hyperparameters": {
+            "learning_rate": 0.001,
+            "gamma": 0.99,
+            "buffer_size": 100000,
+            "batch_size": 64,
+            "epsilon_start": 1.0,
+            "epsilon_end": 0.01,
+            "epsilon_decay_steps": 50000
+          },
+          "downsampled": false
+        },
+        "matchingRules": {
+          "$.body.algorithm": { "matchers": [{ "match": "regex", "regex": "^DQN$" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives training completion event with final metrics",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "PPOTrainer finished training" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "rl.training.completed"
+        }
+      },
+      "response": {
+        "body": {
+          "task_id": "task-rl-001",
+          "algorithm": "PPO",
+          "current_step": 50000,
+          "current_episode": 200,
+          "status": "completed",
+          "metrics": {
+            "reward": [{ "x": 40000, "y": 400.0 }, { "x": 50000, "y": 475.0 }]
+          },
+          "hyperparameters": {
+            "learning_rate": 0.0003,
+            "gamma": 0.99,
+            "batch_size": 64
+          },
+          "downsampled": true
+        },
+        "matchingRules": {
+          "$.body.status": { "matchers": [{ "match": "regex", "regex": "^completed$" }] },
+          "$.body.downsampled": { "matchers": [{ "match": "regex", "regex": "^true$" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:30:00Z",
+    "provider_version": "1.0.0",
+    "description": "Frontend consumes rl-engine training metrics for dashboard: reward/loss/entropy/epsilon curves, PPO and DQN progress, completion events with LTTB downsampling."
+  }
+}

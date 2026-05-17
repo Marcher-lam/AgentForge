@@ -1,0 +1,145 @@
+{
+  "consumer": { "name": "rl-engine" },
+  "provider": { "name": "evolution-engine" },
+  "interactions": [
+    {
+      "description": "RL engine receives decoded RealGenome hyperparams for PPO training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "RealGenome with bounds for RL hyperparams" }],
+      "request": {
+        "method": "DECODE_GENOME",
+        "body": {
+          "genome_type": "real",
+          "genes": [0.0003, 2048.0, 64.0, 0.99, 0.95, 0.2, 0.01, 10.0, 256.0, 256.0],
+          "bounds": [
+            [0.0001, 0.01],
+            [32, 16384],
+            [8, 4096],
+            [0.9, 0.999],
+            [0.8, 1.0],
+            [0.05, 0.5],
+            [0.0, 0.1],
+            [1, 50],
+            [8, 512],
+            [8, 512]
+          ],
+          "param_names": ["learning_rate", "n_steps", "batch_size", "gamma", "gae_lambda", "clip_range", "entropy_coef", "ppo_epochs", "hidden_1", "hidden_2"]
+        },
+        "matchingRules": {
+          "$.body.genome_type": { "matchers": [{ "match": "regex", "regex": "^real$" }] },
+          "$.body.genes": { "matchers": [{ "match": "type" }] },
+          "$.body.bounds": { "matchers": [{ "match": "type" }] }
+        }
+      },
+      "response": {
+        "body": {
+          "learning_rate": 0.0003,
+          "n_steps": 2048,
+          "batch_size": 64,
+          "gamma": 0.99,
+          "gae_lambda": 0.95,
+          "clip_range": 0.2,
+          "entropy_coef": 0.01,
+          "epochs": 10,
+          "hidden_layers": [256, 256]
+        },
+        "matchingRules": {
+          "$.body.learning_rate": { "matchers": [{ "match": "type" }] },
+          "$.body.hidden_layers": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "RL engine receives population stats for curriculum learning",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "evolution engine completed generation 10" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "generation_stats"
+        }
+      },
+      "response": {
+        "body": {
+          "generation": 10,
+          "best_fitness": 350.5,
+          "mean_fitness": 210.3,
+          "std_fitness": 85.7,
+          "diversity": 0.42,
+          "best_individual_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "timestamp": "2026-05-15T18:05:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.generation": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.best_fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.diversity": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "RL engine receives termination signal from evolution engine",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "evolution reached FITNESS_THRESHOLD" }],
+      "request": {
+        "method": "TERMINATION",
+        "body": {
+          "reason": "FITNESS_THRESHOLD",
+          "final_generation": 42,
+          "best_fitness": 475.0,
+          "best_individual_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        }
+      },
+      "response": {
+        "body": {
+          "acknowledged": true,
+          "best_hyperparams": {
+            "learning_rate": 0.0005,
+            "n_steps": 1024,
+            "batch_size": 128,
+            "gamma": 0.995,
+            "hidden_layers": [128, 128]
+          }
+        }
+      }
+    },
+    {
+      "description": "RL engine receives RealGenome bounds for search space definition",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "search space defined for PPO hyperparams" }],
+      "request": {
+        "method": "GET_SEARCH_SPACE",
+        "body": {
+          "genome_type": "real",
+          "target_algorithm": "PPO"
+        }
+      },
+      "response": {
+        "body": {
+          "dimensions": 10,
+          "bounds": [
+            { "param": "learning_rate", "min": 0.0001, "max": 0.01, "scale": "log" },
+            { "param": "n_steps", "min": 32, "max": 16384, "scale": "linear" },
+            { "param": "batch_size", "min": 8, "max": 4096, "scale": "linear" },
+            { "param": "gamma", "min": 0.9, "max": 0.999, "scale": "linear" },
+            { "param": "gae_lambda", "min": 0.8, "max": 1.0, "scale": "linear" },
+            { "param": "clip_range", "min": 0.05, "max": 0.5, "scale": "linear" },
+            { "param": "entropy_coef", "min": 0.0, "max": 0.1, "scale": "linear" },
+            { "param": "epochs", "min": 1, "max": 50, "scale": "linear" },
+            { "param": "hidden_1", "min": 8, "max": 512, "scale": "linear" },
+            { "param": "hidden_2", "min": 8, "max": 512, "scale": "linear" }
+          ]
+        },
+        "matchingRules": {
+          "$.body.dimensions": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.bounds": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T20:30:00Z",
+    "provider_version": "1.0.0",
+    "description": "RL engine consumes evolution engine outputs: decoded genomes as hyperparams, population stats for curriculum learning, termination signals, and search space definitions."
+  }
+}

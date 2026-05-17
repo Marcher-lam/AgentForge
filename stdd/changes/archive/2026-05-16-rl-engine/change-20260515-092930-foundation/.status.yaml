@@ -1,0 +1,24 @@
+change_id: "change-20260515-092930-foundation"
+title: "RL Foundation Layer"
+type: feature
+status: confirmed
+created: "2026-05-15T09:29:30"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - rl-foundation.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 85

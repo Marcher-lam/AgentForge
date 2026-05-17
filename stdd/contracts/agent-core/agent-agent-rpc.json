@@ -1,0 +1,126 @@
+{
+  "consumer": { "name": "rlforge-agent" },
+  "provider": { "name": "agent-core" },
+  "interactions": [
+    {
+      "description": "RL agent subscribes to training task dispatch topic",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "message bus has rl.training topic" }],
+      "request": {
+        "method": "SUBSCRIBE",
+        "topic": "rl.training.>"
+      },
+      "response": {
+        "body": {
+          "subscription_id": "11111111-1111-1111-1111-111111111111",
+          "topic": "rl.training.>"
+        }
+      }
+    },
+    {
+      "description": "RL agent receives training task assignment",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "coordinator dispatches RL training task" }],
+      "request": {
+        "method": "LISTEN",
+        "topic": "rl.training.dispatch"
+      },
+      "response": {
+        "body": {
+          "message_id": "22222222-2222-2222-2222-222222222222",
+          "topic": "rl.training.dispatch",
+          "message_type": "json",
+          "sender_id": "coordinator-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "algorithm": "PPO",
+            "env_id": "CartPole-v1",
+            "hyperparams": {
+              "learning_rate": 0.0003,
+              "n_steps": 2048,
+              "batch_size": 64,
+              "gamma": 0.99
+            },
+            "max_steps": 50000,
+            "seed": 42
+          },
+          "correlation_id": null,
+          "timestamp": "2026-05-15T18:00:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.payload.algorithm": { "matchers": [{ "match": "regex", "regex": "^(PPO|DQN|MADDPG)$" }] },
+          "$.body.payload.max_steps": { "matchers": [{ "match": "integer", "min": 100 }] },
+          "$.body.payload.seed": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "RL agent publishes training progress update",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL agent is training" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.progress",
+        "body": {
+          "message_id": "33333333-3333-3333-3333-333333333333",
+          "topic": "rl.training.progress",
+          "message_type": "json",
+          "sender_id": "rl-agent-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "current_step": 1000,
+            "current_episode": 5,
+            "mean_reward": 150.5,
+            "epsilon": 0.85,
+            "policy_loss": 0.12,
+            "value_loss": 0.34
+          },
+          "correlation_id": "22222222-2222-2222-2222-222222222222",
+          "timestamp": "2026-05-15T18:05:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 2
+        }
+      }
+    },
+    {
+      "description": "RL agent publishes training completion",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL agent finished training" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.completed",
+        "body": {
+          "message_id": "44444444-4444-4444-4444-444444444444",
+          "topic": "rl.training.completed",
+          "message_type": "json",
+          "sender_id": "rl-agent-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "total_steps": 50000,
+            "total_episodes": 200,
+            "final_mean_reward": 475.0,
+            "termination_reason": "MAX_STEPS",
+            "checkpoint_path": "/checkpoints/ppo_cartpole_42.pt"
+          },
+          "correlation_id": "22222222-2222-2222-2222-222222222222",
+          "timestamp": "2026-05-15T19:00:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 2
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T18:00:00Z",
+    "provider_version": "1.0.0"
+  }
+}

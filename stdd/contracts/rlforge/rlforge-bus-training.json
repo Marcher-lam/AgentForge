@@ -1,0 +1,190 @@
+{
+  "consumer": { "name": "rlforge" },
+  "provider": { "name": "agent-core" },
+  "interactions": [
+    {
+      "description": "RL trainer subscribes to training task dispatch",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "message bus has rl.training topic" }],
+      "request": {
+        "method": "SUBSCRIBE",
+        "topic": "rl.training.>"
+      },
+      "response": {
+        "body": {
+          "subscription_id": "11111111-1111-1111-1111-111111111111",
+          "topic": "rl.training.>"
+        }
+      }
+    },
+    {
+      "description": "RL trainer receives training config via task dispatch",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "coordinator dispatches RL training task" }],
+      "request": {
+        "method": "LISTEN",
+        "topic": "rl.training.dispatch"
+      },
+      "response": {
+        "body": {
+          "message_id": "22222222-2222-2222-2222-222222222222",
+          "topic": "rl.training.dispatch",
+          "message_type": "json",
+          "sender_id": "coordinator-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "algorithm": "PPO",
+            "env_id": "CartPole-v1",
+            "hyperparams": {
+              "learning_rate": 0.0003,
+              "n_steps": 2048,
+              "batch_size": 64,
+              "gamma": 0.99,
+              "gae_lambda": 0.95,
+              "clip_epsilon": 0.2,
+              "entropy_coef": 0.01,
+              "ppo_epochs": 10,
+              "hidden_layers": [256, 256]
+            },
+            "max_steps": 50000,
+            "seed": 42,
+            "checkpoint_interval": 10000
+          },
+          "correlation_id": null,
+          "timestamp": "2026-05-15T18:00:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.payload.algorithm": { "matchers": [{ "match": "regex", "regex": "^(PPO|DQN|MADDPG)$" }] },
+          "$.body.payload.max_steps": { "matchers": [{ "match": "integer", "min": 100 }] },
+          "$.body.payload.seed": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "RL trainer publishes step-level progress",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL trainer completed a training step" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.step",
+        "body": {
+          "message_id": "33333333-3333-3333-3333-333333333333",
+          "topic": "rl.training.step",
+          "message_type": "json",
+          "sender_id": "rl-trainer-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "step": 1000,
+            "episode": 5,
+            "reward": 150.5,
+            "loss": 0.12,
+            "epsilon": null,
+            "entropy": 0.85
+          },
+          "correlation_id": "22222222-2222-2222-2222-222222222222",
+          "timestamp": "2026-05-15T18:05:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 2
+        }
+      }
+    },
+    {
+      "description": "RL trainer publishes episode completion",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL trainer completed an episode" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.episode",
+        "body": {
+          "message_id": "44444444-4444-4444-4444-444444444444",
+          "topic": "rl.training.episode",
+          "message_type": "json",
+          "sender_id": "rl-trainer-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "episode": 10,
+            "total_reward": 475.0,
+            "length": 500
+          },
+          "correlation_id": "22222222-2222-2222-2222-222222222222",
+          "timestamp": "2026-05-15T18:10:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 2
+        }
+      }
+    },
+    {
+      "description": "RL trainer publishes training completion",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL trainer finished training" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.completed",
+        "body": {
+          "message_id": "55555555-5555-5555-5555-555555555555",
+          "topic": "rl.training.completed",
+          "message_type": "json",
+          "sender_id": "rl-trainer-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "total_steps": 50000,
+            "total_episodes": 200,
+            "final_mean_reward": 475.0,
+            "termination_reason": "MAX_STEPS",
+            "checkpoint_path": "/checkpoints/ppo_cartpole_42.pt"
+          },
+          "correlation_id": "22222222-2222-2222-2222-222222222222",
+          "timestamp": "2026-05-15T19:00:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 2
+        }
+      }
+    },
+    {
+      "description": "RL trainer publishes checkpoint saved event",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "RL trainer saved a checkpoint" }],
+      "request": {
+        "method": "PUBLISH",
+        "topic": "rl.training.checkpoint",
+        "body": {
+          "message_id": "66666666-6666-6666-6666-666666666666",
+          "topic": "rl.training.checkpoint",
+          "message_type": "json",
+          "sender_id": "rl-trainer-001",
+          "payload": {
+            "task_id": "task-rl-001",
+            "step": 10000,
+            "path": "/checkpoints/ppo_cartpole_42_step10000.pt",
+            "mean_reward": 320.5
+          },
+          "correlation_id": null,
+          "timestamp": "2026-05-15T18:30:00+00:00"
+        }
+      },
+      "response": {
+        "body": {
+          "delivered": true,
+          "subscribers": 1
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T20:00:00Z",
+    "provider_version": "1.0.0"
+  }
+}

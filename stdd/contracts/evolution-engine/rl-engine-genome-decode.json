@@ -1,0 +1,119 @@
+{
+  "consumer": { "name": "rl-engine" },
+  "provider": { "name": "evolution-engine" },
+  "interactions": [
+    {
+      "description": "RL engine consumes RealGenome as decoded PPO hyperparams",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "RealGenome individual exists with fitness" }],
+      "request": {
+        "method": "GET_INDIVIDUAL",
+        "body": {
+          "individual_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        }
+      },
+      "response": {
+        "body": {
+          "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "genome": {
+            "genes": [0.0003, 2048.0, 64.0, 0.99, 0.95, 0.2, 0.01, 10.0, 256.0, 256.0],
+            "bounds": [[0.0001, 0.01], [32, 16384], [8, 4096], [0.9, 0.999], [0.8, 1.0], [0.05, 0.5], [0.0, 0.1], [1, 50], [8, 512], [8, 512]],
+            "fitness": 350.5
+          },
+          "generation": 10,
+          "parents": ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"],
+          "fitness": 350.5
+        },
+        "matchingRules": {
+          "$.body.genome.genes": { "matchers": [{ "match": "type" }] },
+          "$.body.genome.fitness": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "RL engine consumes BinaryGenome as encoded DQN config flags",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "BinaryGenome individual exists" }],
+      "request": {
+        "method": "GET_INDIVIDUAL",
+        "body": {
+          "individual_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        }
+      },
+      "response": {
+        "body": {
+          "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "genome": {
+            "genes": [true, false, true, true, false, true, false, true],
+            "fitness": 195.0
+          },
+          "generation": 5,
+          "parents": [],
+          "fitness": 195.0
+        },
+        "matchingRules": {
+          "$.body.genome.genes": { "matchers": [{ "match": "type" }] },
+          "$.body.genome.fitness": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "RL engine receives generation stats for curriculum difficulty adjustment",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "generation 10 completed with diversity data" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "generation_stats"
+        }
+      },
+      "response": {
+        "body": {
+          "generation": 10,
+          "best_fitness": 350.5,
+          "mean_fitness": 210.3,
+          "std_fitness": 85.7,
+          "diversity": 0.42,
+          "best_individual_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "timestamp": "2026-05-15T18:05:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.generation": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.diversity": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "RL engine receives termination signal to stop training early",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "evolution terminated with CONVERGENCE" }],
+      "request": {
+        "method": "TERMINATION",
+        "body": {
+          "subscribe_to": "termination"
+        }
+      },
+      "response": {
+        "body": {
+          "reason": "CONVERGENCE",
+          "final_generation": 25,
+          "best_fitness": 0.92,
+          "mean_fitness": 0.91,
+          "std_fitness": 0.01,
+          "diversity": 0.05,
+          "best_individual_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+          "timestamp": "2026-05-15T18:30:00+00:00"
+        },
+        "matchingRules": {
+          "$.body.reason": { "matchers": [{ "match": "regex", "regex": "^(MAX_GENERATIONS|FITNESS_THRESHOLD|CONVERGENCE)$" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:00:00Z",
+    "provider_version": "1.0.0",
+    "description": "RL engine consumes evolution-engine outputs: individual genomes (real/binary/tree), generation stats for curriculum, termination signals."
+  }
+}

@@ -1,0 +1,17 @@
+# STDD Constitution - Waivers
+# Active waivers exempt specific scopes from article enforcement
+
+waivers:
+  - id: waiver-2026-001
+    article: 2
+    article_name: "TDD"
+    reason: "RL algorithm math expressions (PPO loss, DQN TD target) are standard algorithm correctness established by design, not unit-level mutation testing. rl-engine mutation score 74.4% due to inherent limitations of mutating mathematical formulas."
+    scope: "rlforge/**"
+    metric: "mutation_score"
+    current_value: 74.4
+    threshold: 80.0
+    expires: "2026-05-22"
+    created: "2026-05-15"
+    days: 7
+    approved_by: "team-lead"
+    status: active

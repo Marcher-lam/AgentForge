@@ -1,0 +1,45 @@
+[project]
+name = "agentforge"
+version = "0.1.0"
+description = "Multi-Agent collaboration framework"
+requires-python = ">=3.12"
+dependencies = [
+    "anyio>=4.0",
+    "websockets>=12.0",
+    "structlog>=24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-anyio>=0.0.0",
+    "pytest-cov>=5.0",
+    "mypy>=1.10",
+    "ruff>=0.5",
+]
+llm-openai = ["openai>=1.0"]
+llm-anthropic = ["anthropic>=0.30"]
+llm-ollama = ["httpx>=0.27"]
+llm = ["openai>=1.0", "anthropic>=0.30", "httpx>=0.27"]
+memory = ["aiosqlite>=0.20"]
+vector = ["numpy>=1.26"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: integration tests",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.agentforge]
+log_level = "INFO"
+websocket.host = "0.0.0.0"
+websocket.port = 8080

@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-broadcast",
+  "title": "AgentBroadcast",
+  "description": "Broadcast event notification — fire-and-forget to all topic subscribers",
+  "type": "object",
+  "properties": {
+    "broadcast_id": { "type": "string", "format": "uuid" },
+    "sender_id": { "type": "string", "format": "uuid" },
+    "topic": { "type": "string", "minLength": 1, "pattern": "^[a-zA-Z0-9_.\\-*]+$" },
+    "event": {
+      "type": "string",
+      "enum": [
+        "agent_online", "agent_offline", "agent_error",
+        "task_started", "task_progress", "task_completed", "task_failed",
+        "model_updated", "config_changed",
+        "generation_end", "evaluation_done", "termination",
+        "episode_end", "training_step", "checkpoint_saved"
+      ],
+      "description": "Predefined event types for system-wide notifications"
+    },
+    "payload": { "type": "object", "additionalProperties": true },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "session", "namespace"],
+      "default": "global",
+      "description": "Broadcast visibility scope"
+    },
+    "scope_id": {
+      "type": ["string", "null"],
+      "description": "Session or namespace ID when scope is not global"
+    },
+    "ttl_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Time-to-live in ms; 0 = no expiry"
+    },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": ["broadcast_id", "sender_id", "topic", "event", "timestamp"],
+  "additionalProperties": false
+}

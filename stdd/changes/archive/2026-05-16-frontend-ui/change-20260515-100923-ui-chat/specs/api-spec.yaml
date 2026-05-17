@@ -1,0 +1,798 @@
+openapi: "3.0.3"
+info:
+  title: Frontend Backend API
+  description: |
+    前端后端 API，包含会话管理、消息收发、Agent 状态查询和实时消息推送。
+    为 Chat UI、Monitor、Dashboard 提供统一后端接口。
+  version: "1.0.0"
+  contact:
+    name: Frontend Team
+
+servers:
+  - url: "http://localhost:3000/api/v1"
+    description: 前端后端服务器
+  - url: "ws://localhost:3000/ws"
+    description: WebSocket 端点
+
+tags:
+  - name: Sessions
+    description: 会话管理
+  - name: Messages
+    description: 消息收发
+  - name: Agents
+    description: Agent 状态查询
+  - name: Realtime
+    description: 实时消息推送
+  - name: Monitoring
+    description: Agent 通信监控
+  - name: Dashboard
+    description: 进化/训练仪表板数据
+
+paths:
+  # ─── Sessions ───
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: 创建会话
+      operationId: createSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: 会话创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+
+    get:
+      tags: [Sessions]
+      summary: 列出会话
+      operationId: listSessions
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/SessionType"
+      responses:
+        "200":
+          description: 会话列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionResponse"
+
+  /sessions/{sessionId}:
+    get:
+      tags: [Sessions]
+      summary: 获取会话详情
+      operationId: getSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: 会话详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags: [Sessions]
+      summary: 删除会话
+      operationId: deleteSession
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: 会话已删除
+
+  # ─── Messages ───
+  /sessions/{sessionId}/messages:
+    get:
+      tags: [Messages]
+      summary: 获取消息历史
+      operationId: getMessages
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: 分页游标，获取此消息 ID 之前的消息
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/FrontendMessageType"
+      responses:
+        "200":
+          description: 消息列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageListResponse"
+
+    post:
+      tags: [Messages]
+      summary: 发送消息
+      operationId: sendMessage
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          description: 消息发送成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrontendMessage"
+
+  # ─── Agents ───
+  /agents:
+    get:
+      tags: [Agents]
+      summary: 列出在线 Agent
+      operationId: listAgents
+      responses:
+        "200":
+          description: Agent 列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentSummary"
+
+  /agents/{agentId}:
+    get:
+      tags: [Agents]
+      summary: 获取 Agent 详情
+      operationId: getAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent 详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ─── Realtime (WebSocket + SSE) ───
+  /ws/messages:
+    get:
+      tags: [Realtime]
+      summary: WebSocket 消息推送
+      description: |
+        WebSocket 升级端点，实时推送消息和 Agent 状态变更。
+        客户端连接后可订阅特定 session 或 agent 的消息。
+        消息格式: {"type": "message"|"state_change"|"monitor", "data": {...}}
+      operationId: wsMessages
+      responses:
+        "101":
+          description: WebSocket 升级成功
+
+  /sse/messages:
+    get:
+      tags: [Realtime]
+      summary: SSE 消息推送（降级）
+      description: |
+        SSE 降级端点，当 WebSocket 不可用时使用。
+        事件格式: `data: {"type": "message", "data": {...}}`
+      operationId: sseMessages
+      parameters:
+        - name: session_ids
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: object
+
+  # ─── Monitoring ───
+  /monitor/messages:
+    get:
+      tags: [Monitoring]
+      summary: 获取 Agent 间通信消息
+      operationId: getMonitorMessages
+      parameters:
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: topic
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: time_start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: time_end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: payload 关键字搜索
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+            maximum: 1000
+        - name: cursor
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 监控消息列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitorMessageList"
+
+  /monitor/statistics:
+    get:
+      tags: [Monitoring]
+      summary: 获取通信统计
+      operationId: getMonitorStatistics
+      parameters:
+        - name: time_range
+          in: query
+          schema:
+            type: string
+            enum: [1m, 5m, 15m, 1h, 6h, 24h]
+            default: 5m
+      responses:
+        "200":
+          description: 通信统计数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitorStatistics"
+
+  /monitor/topology:
+    get:
+      tags: [Monitoring]
+      summary: 获取 Agent 拓扑图数据
+      operationId: getTopology
+      responses:
+        "200":
+          description: 拓扑图数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopologyData"
+
+  # ─── Dashboard ───
+  /dashboard/evolution/{evolutionId}:
+    get:
+      tags: [Dashboard]
+      summary: 获取进化仪表板数据
+      operationId: getEvolutionDashboard
+      parameters:
+        - name: evolutionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from_gen
+          in: query
+          schema:
+            type: integer
+        - name: to_gen
+          in: query
+          schema:
+            type: integer
+        - name: max_points
+          in: query
+          schema:
+            type: integer
+            default: 10000
+      responses:
+        "200":
+          description: 进化仪表板数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolutionDashboardData"
+
+  /dashboard/training/{taskId}:
+    get:
+      tags: [Dashboard]
+      summary: 获取 RL 训练仪表板数据
+      operationId: getTrainingDashboard
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: metric_names
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+        - name: from_step
+          in: query
+          schema:
+            type: integer
+        - name: max_points
+          in: query
+          schema:
+            type: integer
+            default: 10000
+      responses:
+        "200":
+          description: RL 训练仪表板数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingDashboardData"
+
+  /dashboard/training/compare:
+    get:
+      tags: [Dashboard]
+      summary: 多 run 训练对比
+      operationId: compareTrainingRuns
+      parameters:
+        - name: task_ids
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: false
+        - name: metric_name
+          in: query
+          schema:
+            type: string
+            default: reward
+        - name: max_points
+          in: query
+          schema:
+            type: integer
+            default: 10000
+      responses:
+        "200":
+          description: 多 run 对比数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingCompareData"
+
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    SessionType:
+      type: string
+      enum: [ONE_VS_ONE, GROUP_BROADCAST, GROUP_MULTICAST]
+
+    FrontendMessageType:
+      type: string
+      enum: [TEXT, MARKDOWN, CODE, IMAGE, FILE, SYSTEM]
+
+    CreateSessionRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: "#/components/schemas/SessionType"
+        agent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 参会 Agent ID 列表（1v1 为单个，群组为多个）
+        name:
+          type: string
+          description: 会话名称（可选）
+
+    SessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/SessionType"
+        name:
+          type: string
+          nullable: true
+        agent_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        unread_count:
+          type: integer
+        last_message:
+          $ref: "#/components/schemas/FrontendMessage"
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FrontendMessage:
+      type: object
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [USER, AGENT, SYSTEM]
+        sender_id:
+          type: string
+          format: uuid
+          nullable: true
+        sender_name:
+          type: string
+        content:
+          type: string
+        content_type:
+          $ref: "#/components/schemas/FrontendMessageType"
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    SendMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        content_type:
+          $ref: "#/components/schemas/FrontendMessageType"
+          default: TEXT
+        metadata:
+          type: object
+          additionalProperties: true
+
+    MessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/FrontendMessage"
+        has_more:
+          type: boolean
+        cursor:
+          type: string
+          nullable: true
+
+    AgentSummary:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ONLINE, OFFLINE, BUSY, ERROR]
+        last_message_preview:
+          type: string
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    # ─── Monitor ───
+    MonitorMessage:
+      type: object
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        receiver_id:
+          type: string
+          format: uuid
+          nullable: true
+        topic:
+          type: string
+        message_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+
+    MonitorMessageList:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonitorMessage"
+        has_more:
+          type: boolean
+        cursor:
+          type: string
+          nullable: true
+        total_count:
+          type: integer
+
+    MonitorStatistics:
+      type: object
+      properties:
+        total_messages:
+          type: integer
+        messages_per_sec:
+          type: number
+        avg_latency_ms:
+          type: number
+        per_agent_stats:
+          type: array
+          items:
+            type: object
+            properties:
+              agent_id:
+                type: string
+                format: uuid
+              sent_count:
+                type: integer
+              received_count:
+                type: integer
+        topic_distribution:
+          type: object
+          additionalProperties:
+            type: integer
+
+    TopologyData:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              agent_id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              status:
+                type: string
+              position:
+                type: object
+                properties:
+                  x:
+                    type: number
+                  y:
+                    type: number
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              source_id:
+                type: string
+                format: uuid
+              target_id:
+                type: string
+                format: uuid
+              message_count:
+                type: integer
+              frequency:
+                type: string
+                enum: [LOW, MEDIUM, HIGH]
+
+    # ─── Dashboard ───
+    EvolutionDashboardData:
+      type: object
+      properties:
+        evolution_id:
+          type: string
+          format: uuid
+        current_generation:
+          type: integer
+        status:
+          type: string
+        fitness_curves:
+          type: object
+          properties:
+            best:
+              type: array
+              items:
+                $ref: "#/components/schemas/DataPoint"
+            mean:
+              type: array
+              items:
+                $ref: "#/components/schemas/DataPoint"
+            std:
+              type: array
+              items:
+                $ref: "#/components/schemas/DataPoint"
+        gene_tree:
+          type: object
+          description: 基因世代树（嵌套结构）
+        heatmap:
+          type: object
+          description: 基因×个体热力图数据
+          properties:
+            gene_dims:
+              type: integer
+            individuals:
+              type: integer
+            values:
+              type: array
+              items:
+                type: array
+                items:
+                  type: number
+        downsampled:
+          type: boolean
+
+    TrainingDashboardData:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        algorithm:
+          type: string
+        current_step:
+          type: integer
+        current_episode:
+          type: integer
+        status:
+          type: string
+        metrics:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: "#/components/schemas/DataPoint"
+        hyperparameters:
+          type: object
+          additionalProperties: true
+        downsampled:
+          type: boolean
+
+    TrainingCompareData:
+      type: object
+      properties:
+        runs:
+          type: array
+          items:
+            type: object
+            properties:
+              task_id:
+                type: string
+                format: uuid
+              label:
+                type: string
+              hyperparameters:
+                type: object
+                additionalProperties: true
+              data:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DataPoint"
+
+    DataPoint:
+      type: object
+      properties:
+        x:
+          type: number
+          description: 世代号或 step
+        y:
+          type: number
+          description: 指标值
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum:
+            [
+              SESSION_NOT_FOUND,
+              AGENT_NOT_FOUND,
+              INVALID_SESSION_TYPE,
+              MESSAGE_SEND_FAILED,
+              WEBSOCKET_ERROR,
+              DASHBOARD_DATA_ERROR,
+            ]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    NotFound:
+      description: 资源未找到
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

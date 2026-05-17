@@ -1,0 +1,288 @@
+{
+  "consumer": { "name": "frontend-ui" },
+  "provider": { "name": "agent-core" },
+  "interactions": [
+    {
+      "description": "Frontend connects to WebSocket and subscribes to agent status",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "websocket server is running on port 8080" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "agents.**"
+        },
+        "matchingRules": {
+          "$.body.subscribe": { "matchers": [{ "match": "type" }] },
+          "$.body.topic": { "matchers": [{ "match": "regex", "regex": "^[a-zA-Z0-9_.\\-*]+$" }] }
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "type": "subscribed",
+          "subscription_id": "12345678-1234-1234-1234-123456789012",
+          "topic": "agents.**"
+        },
+        "matchingRules": {
+          "$.body.subscription_id": { "matchers": [{ "match": "regex", "regex": "^[0-9a-f-]{36}$" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend subscribes to chat messages",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "chat topics exist" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "chat.*"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "type": "subscribed",
+          "subscription_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "topic": "chat.*"
+        }
+      }
+    },
+    {
+      "description": "Frontend sends user message to agent",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "agent ChatBot is online" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "message": {
+            "message_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "topic": "chat.user_message",
+            "message_type": "text",
+            "sender_id": "user-001",
+            "payload": { "content": "Hello agent", "session_id": "sess-001" },
+            "timestamp": "2026-05-15T18:00:00+00:00"
+          },
+          "topic": "chat.user_message"
+        },
+        "matchingRules": {
+          "$.body.message.message_id": { "matchers": [{ "match": "regex", "regex": "^[0-9a-f-]{36}$" }] },
+          "$.body.message.message_type": { "matchers": [{ "match": "regex", "regex": "^(text|json)$" }] },
+          "$.body.message.sender_id": { "matchers": [{ "match": "type" }] }
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "type": "message_delivered",
+          "message_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "subscribers_notified": 1
+        },
+        "matchingRules": {
+          "$.body.subscribers_notified": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives agent response",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "agent ChatBot responds to user message" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "chat.agent_response"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "message": {
+            "message_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "topic": "chat.agent_response",
+            "message_type": "text",
+            "sender_id": "agent-chatbot-001",
+            "payload": { "content": "Hello! How can I help?", "session_id": "sess-001" },
+            "correlation_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "timestamp": "2026-05-15T18:00:01+00:00"
+          },
+          "topic": "chat.agent_response"
+        },
+        "matchingRules": {
+          "$.body.message.correlation_id": { "matchers": [{ "match": "regex", "regex": "^[0-9a-f-]{36}$" }] },
+          "$.body.message.payload.content": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend subscribes to evolution dashboard data",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "evolution engine is running" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "evo.**"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "type": "subscribed",
+          "subscription_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+          "topic": "evo.**"
+        }
+      }
+    },
+    {
+      "description": "Frontend receives generation end dashboard update",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "evolution engine completed a generation" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "evo.generation.end"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "message": {
+            "message_id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+            "topic": "evo.generation.end",
+            "message_type": "json",
+            "sender_id": "evo-engine-001",
+            "payload": {
+              "evolution_id": "evo-001",
+              "current_generation": 10,
+              "status": "running",
+              "fitness_curves": {
+                "best": [{ "x": 1, "y": 0.5 }, { "x": 10, "y": 0.92 }],
+                "mean": [{ "x": 1, "y": 0.3 }, { "x": 10, "y": 0.78 }],
+                "std": [{ "x": 1, "y": 0.1 }, { "x": 10, "y": 0.05 }]
+              },
+              "downsampled": false
+            },
+            "correlation_id": null,
+            "timestamp": "2026-05-15T18:05:00+00:00"
+          },
+          "topic": "evo.generation.end"
+        },
+        "matchingRules": {
+          "$.body.message.payload.status": { "matchers": [{ "match": "regex", "regex": "^(running|completed|failed)$" }] },
+          "$.body.message.payload.fitness_curves": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend subscribes to RL training dashboard data",
+      "type": "Synchronous/Message",
+      "providerStates": [{ "name": "RL trainer is running" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "rl.training.**"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "type": "subscribed",
+          "subscription_id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+          "topic": "rl.training.**"
+        }
+      }
+    },
+    {
+      "description": "Frontend receives RL training progress dashboard update",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "RL trainer publishing progress" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": {
+          "subscribe": true,
+          "topic": "rl.training.step"
+        }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "message": {
+            "message_id": "10101010-1010-1010-1010-101010101010",
+            "topic": "rl.training.step",
+            "message_type": "json",
+            "sender_id": "rl-trainer-001",
+            "payload": {
+              "task_id": "task-rl-001",
+              "algorithm": "PPO",
+              "current_step": 1000,
+              "current_episode": 5,
+              "status": "running",
+              "metrics": {
+                "reward": [{ "x": 100, "y": 50.0 }, { "x": 1000, "y": 150.5 }],
+                "loss": [{ "x": 100, "y": 0.5 }, { "x": 1000, "y": 0.12 }]
+              },
+              "hyperparameters": {
+                "learning_rate": 0.0003,
+                "gamma": 0.99,
+                "batch_size": 64
+              },
+              "downsampled": false
+            },
+            "correlation_id": null,
+            "timestamp": "2026-05-15T18:05:00+00:00"
+          },
+          "topic": "rl.training.step"
+        },
+        "matchingRules": {
+          "$.body.message.payload.algorithm": { "matchers": [{ "match": "regex", "regex": "^(PPO|DQN|MADDPG)$" }] },
+          "$.body.message.payload.status": { "matchers": [{ "match": "regex", "regex": "^(running|completed|failed)$" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives agent status broadcast",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "agent goes online" }],
+      "request": {
+        "method": "SEND",
+        "path": "/",
+        "body": { "subscribe": true, "topic": "agents.**" }
+      },
+      "response": {
+        "status": null,
+        "body": {
+          "message": {
+            "message_id": "12121212-1212-1212-1212-121212121212",
+            "topic": "agents.status",
+            "message_type": "system",
+            "sender_id": "agent-chatbot-001",
+            "payload": { "event": "agent_online", "agent_id": "agent-chatbot-001", "status": "running" },
+            "timestamp": "2026-05-15T18:02:00+00:00"
+          },
+          "topic": "agents.status"
+        },
+        "matchingRules": {
+          "$.body.message.payload.event": { "matchers": [{ "match": "regex", "regex": "^agent_(online|offline|error)$" }] },
+          "$.body.message.payload.status": { "matchers": [{ "match": "regex", "regex": "^(created|initialized|running|stopped|destroyed)$" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T20:00:00Z",
+    "provider_version": "1.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.24",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
+    "framer-motion": "^12.38.0",
+    "jotai": "^2.20.0",
+    "jsdom": "^29.1.1",
+    "react-router-dom": "^7.15.1",
+    "reactflow": "^11.11.4",
+    "vitest": "^4.1.6"
+  }
+}

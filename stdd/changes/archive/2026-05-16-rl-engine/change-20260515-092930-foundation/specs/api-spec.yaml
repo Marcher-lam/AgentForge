@@ -1,0 +1,710 @@
+openapi: "3.0.3"
+info:
+  title: RLForge Training Engine API
+  description: |
+    强化学习引擎 API，包含环境注册/管理、训练任务生命周期、
+    检查点管理和训练指标查询。
+    支持 DQN、PPO、MADDPG 算法。
+  version: "1.0.0"
+  contact:
+    name: RLForge Team
+
+servers:
+  - url: "http://localhost:8082/api/v1"
+    description: RL 引擎服务器
+
+tags:
+  - name: Environments
+    description: 环境注册与管理
+  - name: Training
+    description: 训练任务管理
+  - name: Checkpoints
+    description: 检查点管理
+  - name: Metrics
+    description: 训练指标查询
+
+paths:
+  # ─── Environments ───
+  /environments:
+    get:
+      tags: [Environments]
+      summary: 列出已注册环境
+      operationId: listEnvironments
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [SINGLE_AGENT, MULTI_AGENT]
+      responses:
+        "200":
+          description: 环境列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EnvironmentInfo"
+
+  /environments/{envId}:
+    get:
+      tags: [Environments]
+      summary: 获取环境详情
+      operationId: getEnvironment
+      parameters:
+        - $ref: "#/components/parameters/EnvId"
+      responses:
+        "200":
+          description: 环境详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentInfo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /environments/{envId}/instances:
+    post:
+      tags: [Environments]
+      summary: 创建环境实例
+      operationId: createEnvInstance
+      parameters:
+        - $ref: "#/components/parameters/EnvId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEnvInstanceRequest"
+      responses:
+        "201":
+          description: 环境实例创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvInstanceResponse"
+
+  /environments/{envId}/instances/{instanceId}:
+    get:
+      tags: [Environments]
+      summary: 获取环境实例状态
+      operationId: getEnvInstance
+      parameters:
+        - $ref: "#/components/parameters/EnvId"
+        - $ref: "#/components/parameters/InstanceId"
+      responses:
+        "200":
+          description: 环境实例状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvInstanceResponse"
+
+    delete:
+      tags: [Environments]
+      summary: 关闭环境实例
+      operationId: closeEnvInstance
+      parameters:
+        - $ref: "#/components/parameters/EnvId"
+        - $ref: "#/components/parameters/InstanceId"
+      responses:
+        "200":
+          description: 环境已关闭
+
+  # ─── Training ───
+  /training-tasks:
+    post:
+      tags: [Training]
+      summary: 创建训练任务
+      operationId: createTrainingTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTrainingTaskRequest"
+      responses:
+        "201":
+          description: 训练任务创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingTaskResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+    get:
+      tags: [Training]
+      summary: 列出训练任务
+      operationId: listTrainingTasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TrainingStatus"
+        - name: algorithm
+          in: query
+          schema:
+            $ref: "#/components/schemas/AlgorithmType"
+      responses:
+        "200":
+          description: 训练任务列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrainingTaskResponse"
+
+  /training-tasks/{taskId}:
+    get:
+      tags: [Training]
+      summary: 获取训练任务详情
+      operationId: getTrainingTask
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: 训练任务详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingTaskResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /training-tasks/{taskId}/start:
+    post:
+      tags: [Training]
+      summary: 启动训练
+      operationId: startTraining
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: 训练已启动
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingTaskResponse"
+        "409":
+          description: 训练已在运行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /training-tasks/{taskId}/stop:
+    post:
+      tags: [Training]
+      summary: 停止训练
+      operationId: stopTraining
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: 训练已停止
+
+  /training-tasks/{taskId}/evaluate:
+    post:
+      tags: [Training]
+      summary: 运行评估
+      operationId: evaluateTraining
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateRequest"
+      responses:
+        "200":
+          description: 评估结果
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluateResponse"
+
+  # ─── Checkpoints ───
+  /training-tasks/{taskId}/checkpoints:
+    get:
+      tags: [Checkpoints]
+      summary: 列出检查点
+      operationId: listCheckpoints
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: 检查点列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CheckpointInfo"
+
+    post:
+      tags: [Checkpoints]
+      summary: 保存检查点
+      operationId: saveCheckpoint
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "201":
+          description: 检查点已保存
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckpointInfo"
+
+  /training-tasks/{taskId}/checkpoints/{checkpointId}/restore:
+    post:
+      tags: [Checkpoints]
+      summary: 从检查点恢复
+      operationId: restoreCheckpoint
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/CheckpointId"
+      responses:
+        "200":
+          description: 已从检查点恢复
+
+  # ─── Metrics ───
+  /training-tasks/{taskId}/metrics:
+    get:
+      tags: [Metrics]
+      summary: 获取训练指标
+      operationId: getTrainingMetrics
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+        - name: metric_names
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+          description: "指标名列表，如: reward,loss,episode_length"
+        - name: from_step
+          in: query
+          schema:
+            type: integer
+        - name: to_step
+          in: query
+          schema:
+            type: integer
+        - name: max_points
+          in: query
+          schema:
+            type: integer
+            default: 10000
+            description: 最大返回数据点数（超过自动 LTTB 降采样）
+      responses:
+        "200":
+          description: 训练指标数据
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrainingMetrics"
+
+  /training-tasks/{taskId}/metrics/stream:
+    get:
+      tags: [Metrics]
+      summary: SSE 实时指标推送
+      description: |
+        Server-Sent Events 端点，实时推送训练指标。
+        事件格式: `data: {"metric_name": "reward", "value": 10.5, "step": 100}`
+      operationId: streamTrainingMetrics
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+        - name: metric_names
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: false
+      responses:
+        "200":
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: object
+
+components:
+  parameters:
+    EnvId:
+      name: envId
+      in: path
+      required: true
+      schema:
+        type: string
+
+    InstanceId:
+      name: instanceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CheckpointId:
+      name: checkpointId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    AlgorithmType:
+      type: string
+      enum: [DQN, PPO, MADDPG]
+
+    TrainingStatus:
+      type: string
+      enum: [PENDING, RUNNING, EVALUATING, PAUSED, COMPLETED, FAILED]
+
+    EnvironmentInfo:
+      type: object
+      properties:
+        env_id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [SINGLE_AGENT, MULTI_AGENT]
+        observation_space:
+          type: object
+          properties:
+            shape:
+              type: array
+              items:
+                type: integer
+            dtype:
+              type: string
+        action_space:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [DISCRETE, CONTINUOUS]
+            shape:
+              type: array
+              items:
+                type: integer
+            n:
+              type: integer
+              description: 离散动作数
+        max_episode_steps:
+          type: integer
+          nullable: true
+
+    CreateEnvInstanceRequest:
+      type: object
+      properties:
+        seed:
+          type: integer
+        num_envs:
+          type: integer
+          default: 1
+          description: 并行环境数（VectorEnv）
+          maximum: 32
+        render:
+          type: boolean
+          default: false
+
+    EnvInstanceResponse:
+      type: object
+      properties:
+        instance_id:
+          type: string
+          format: uuid
+        env_id:
+          type: string
+        status:
+          type: string
+          enum: [READY, RUNNING, CLOSED]
+        num_envs:
+          type: integer
+        seed:
+          type: integer
+          nullable: true
+
+    DQNConfig:
+      type: object
+      properties:
+        learning_rate:
+          type: number
+          default: 1e-3
+        buffer_size:
+          type: integer
+          default: 100000
+        batch_size:
+          type: integer
+          default: 64
+        gamma:
+          type: number
+          default: 0.99
+        target_update_freq:
+          type: integer
+          default: 1000
+        target_update_type:
+          type: string
+          enum: [HARD, SOFT]
+          default: HARD
+        tau:
+          type: number
+          default: 0.005
+        epsilon_start:
+          type: number
+          default: 1.0
+        epsilon_end:
+          type: number
+          default: 0.01
+        epsilon_decay_steps:
+          type: integer
+          default: 50000
+        dueling:
+          type: boolean
+          default: true
+        hidden_layers:
+          type: array
+          items:
+            type: integer
+          default: [256, 256]
+
+    PPOConfig:
+      type: object
+      properties:
+        learning_rate:
+          type: number
+          default: 3e-4
+        n_steps:
+          type: integer
+          default: 2048
+        batch_size:
+          type: integer
+          default: 64
+        epochs:
+          type: integer
+          default: 10
+        gamma:
+          type: number
+          default: 0.99
+        gae_lambda:
+          type: number
+          default: 0.95
+        clip_range:
+          type: number
+          default: 0.2
+        entropy_coef:
+          type: number
+          default: 0.01
+        hidden_layers:
+          type: array
+          items:
+            type: integer
+          default: [256, 256]
+
+    MADDPGConfig:
+      type: object
+      properties:
+        actor_lr:
+          type: number
+          default: 1e-4
+        critic_lr:
+          type: number
+          default: 1e-3
+        buffer_size:
+          type: integer
+          default: 100000
+        batch_size:
+          type: integer
+          default: 256
+        gamma:
+          type: number
+          default: 0.99
+        tau:
+          type: number
+          default: 0.01
+        noise_type:
+          type: string
+          enum: [GAUSSIAN, OU]
+          default: GAUSSIAN
+        noise_sigma:
+          type: number
+          default: 0.2
+
+    CreateTrainingTaskRequest:
+      type: object
+      required: [algorithm, env_id]
+      properties:
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmType"
+        env_id:
+          type: string
+        algorithm_config:
+          oneOf:
+            - $ref: "#/components/schemas/DQNConfig"
+            - $ref: "#/components/schemas/PPOConfig"
+            - $ref: "#/components/schemas/MADDPGConfig"
+        seed:
+          type: integer
+        max_steps:
+          type: integer
+          default: 500000
+        eval_freq:
+          type: integer
+          default: 10
+        callbacks:
+          type: array
+          items:
+            type: string
+
+    TrainingTaskResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        algorithm:
+          $ref: "#/components/schemas/AlgorithmType"
+        env_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/TrainingStatus"
+        current_step:
+          type: integer
+        current_episode:
+          type: integer
+        best_reward:
+          type: number
+        seed:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CheckpointInfo:
+      type: object
+      properties:
+        checkpoint_id:
+          type: string
+        task_id:
+          type: string
+          format: uuid
+        step:
+          type: integer
+        episode:
+          type: integer
+        reward:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        size_bytes:
+          type: integer
+
+    EvaluateRequest:
+      type: object
+      properties:
+        num_episodes:
+          type: integer
+          default: 10
+        render:
+          type: boolean
+          default: false
+
+    EvaluateResponse:
+      type: object
+      properties:
+        mean_reward:
+          type: number
+        std_reward:
+          type: number
+        mean_length:
+          type: number
+        episodes:
+          type: integer
+
+    TrainingMetrics:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        metrics:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              properties:
+                step:
+                  type: integer
+                value:
+                  type: number
+                timestamp:
+                  type: string
+                  format: date-time
+        downsampled:
+          type: boolean
+          description: 是否经过 LTTB 降采样
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum:
+            [
+              ENV_NOT_FOUND,
+              ENV_INSTANCE_ERROR,
+              TASK_NOT_FOUND,
+              INVALID_CONFIG,
+              TRAINING_FAILED,
+              CHECKPOINT_NOT_FOUND,
+              CHECKPOINT_RESTORE_ERROR,
+            ]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: 资源未找到
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

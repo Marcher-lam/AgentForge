@@ -1,0 +1,126 @@
+{
+  "consumer": { "name": "frontend-ui" },
+  "provider": { "name": "evolution-engine" },
+  "interactions": [
+    {
+      "description": "Frontend receives GenerationStats for evolution dashboard fitness curves",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "generation 10 completed" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "generation_stats"
+        }
+      },
+      "response": {
+        "body": {
+          "evolution_id": "evo-001",
+          "current_generation": 10,
+          "status": "running",
+          "fitness_curves": {
+            "best": [
+              { "x": 1, "y": 0.35 },
+              { "x": 5, "y": 0.72 },
+              { "x": 10, "y": 0.92 }
+            ],
+            "mean": [
+              { "x": 1, "y": 0.20 },
+              { "x": 5, "y": 0.55 },
+              { "x": 10, "y": 0.78 }
+            ],
+            "std": [
+              { "x": 1, "y": 0.15 },
+              { "x": 5, "y": 0.10 },
+              { "x": 10, "y": 0.05 }
+            ]
+          },
+          "downsampled": false
+        },
+        "matchingRules": {
+          "$.body.status": { "matchers": [{ "match": "regex", "regex": "^(running|completed|failed)$" }] },
+          "$.body.current_generation": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.fitness_curves.best": { "matchers": [{ "match": "type" }] },
+          "$.body.fitness_curves.mean": { "matchers": [{ "match": "type" }] },
+          "$.body.fitness_curves.std": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives evolution completion event",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "evolution terminated" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "termination"
+        }
+      },
+      "response": {
+        "body": {
+          "evolution_id": "evo-001",
+          "current_generation": 42,
+          "status": "completed",
+          "fitness_curves": {
+            "best": [
+              { "x": 1, "y": 0.35 },
+              { "x": 42, "y": 0.96 }
+            ],
+            "mean": [
+              { "x": 1, "y": 0.20 },
+              { "x": 42, "y": 0.89 }
+            ],
+            "std": [
+              { "x": 1, "y": 0.15 },
+              { "x": 42, "y": 0.03 }
+            ]
+          },
+          "termination_reason": "FITNESS_THRESHOLD",
+          "best_individual": {
+            "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "genome": { "type": "real", "genes": [0.0005, 1024.0, 128.0, 0.995, 0.92, 0.15, 0.005, 8.0, 128.0, 128.0] },
+            "fitness": 475.0,
+            "generation": 38
+          },
+          "downsampled": true
+        },
+        "matchingRules": {
+          "$.body.status": { "matchers": [{ "match": "regex", "regex": "^completed$" }] },
+          "$.body.termination_reason": { "matchers": [{ "match": "regex", "regex": "^(MAX_GENERATIONS|FITNESS_THRESHOLD|CONVERGENCE)$" }] }
+        }
+      }
+    },
+    {
+      "description": "Frontend receives large dataset with LTTB downsampling applied",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "generation 500 with >10000 data points" }],
+      "request": {
+        "method": "LISTEN",
+        "body": {
+          "subscribe_to": "generation_stats"
+        }
+      },
+      "response": {
+        "body": {
+          "evolution_id": "evo-002",
+          "current_generation": 500,
+          "status": "running",
+          "fitness_curves": {
+            "best": [{ "x": 1, "y": 0.1 }, { "x": 500, "y": 0.88 }],
+            "mean": [{ "x": 1, "y": 0.05 }, { "x": 500, "y": 0.70 }],
+            "std": [{ "x": 1, "y": 0.12 }, { "x": 500, "y": 0.06 }]
+          },
+          "downsampled": true
+        },
+        "matchingRules": {
+          "$.body.downsampled": { "matchers": [{ "match": "regex", "regex": "^true$" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:00:00Z",
+    "provider_version": "1.0.0",
+    "description": "Frontend consumes evolution-engine GenerationStats for dashboard: fitness curves (best/mean/std), termination events, LTTB downsampling."
+  }
+}

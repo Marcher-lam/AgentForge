@@ -1,0 +1,123 @@
+{
+  "scan_date": "2026-05-16T02:00:00Z",
+  "project": "EvoRL (agentforge)",
+  "scope": "agent-core deep scan (AST-based)",
+  "source_stats": {
+    "files_scanned": 34,
+    "total_lines": 1428,
+    "class_count": 41,
+    "sync_functions": 95,
+    "async_functions": 33,
+    "total_functions": 128
+  },
+  "naming": {
+    "class_style": {"PascalCase": 41},
+    "function_style": {"snake_case": 95, "other": 33},
+    "convention": "PascalCase classes (100%), snake_case functions/methods",
+    "remark": "41/41 classes PascalCase, 0 naming violations detected"
+  },
+  "async": {
+    "asyncio_usage": 2,
+    "anyio_usage": 2,
+    "primary": "mixed (asyncio for Queue/Future, anyio for Lock)",
+    "inconsistency": "ADR-1 declares anyio but implementation uses asyncio primitives",
+    "test_marker": "pytest.mark.anyio (103 uses)",
+    "async_method_ratio": "33/128 = 25.8% async"
+  },
+  "architecture": {
+    "protocols": ["FitnessFunction", "Genome", "MessageBus", "ToolRegistry", "SkillRegistry", "MemoryStore"],
+    "enums": ["MessageType", "AgentState"],
+    "custom_exceptions": {
+      "hierarchy": "AgentForgeError → AgentError/BusError/ConfigError",
+      "specifics": ["InvalidStateTransition", "AgentInitFailed", "SubscriptionNotFound", "RpcTimeout"],
+      "total": 8
+    },
+    "dataclass_count": 18,
+    "dataclass_fields": 33,
+    "runtime_checkable_protocols": 12
+  },
+  "design_patterns": {
+    "State Machine": ["AgentBase"],
+    "Template Method": ["AgentBase", "InProcessMessageBus", "WebSocketMessageBus"],
+    "Observer/Pub-Sub": ["InProcessMessageBus", "MessageBus"],
+    "Protocol/Interface": ["FitnessFunction", "Genome", "MessageBus", "ToolRegistry", "SkillRegistry", "MemoryStore"],
+    "Facade": ["AgentBase", "InProcessMessageBus", "WebSocketMessageBus", "CompositeCallback", "EvolutionEngine", "Population", "GracefulShutdown"],
+    "Callback": ["AgentBase", "Callback", "StatsCollector", "CompositeCallback", "EvolutionEngine", "GracefulShutdown"],
+    "Factory": ["Message"],
+    "total_patterns": 7
+  },
+  "anti_patterns": {
+    "silent_catch": [
+      {"file": "agentforge/bus/inprocess.py", "line": 74, "context": "_deliver exception isolation (intentional)"},
+      {"file": "agentforge/bus/inprocess.py", "line": 91, "context": "publish delivery_failed handling"}
+    ],
+    "god_class": [
+      {"class": "AgentBase", "methods": 11, "severity": "borderline"}
+    ],
+    "hardcoded_secrets": [],
+    "bare_except": [],
+    "long_method": []
+  },
+  "imports_top15": {
+    "__future__": 23,
+    "typing": 20,
+    "agentforge": 18,
+    "numpy": 18,
+    "dataclasses": 7,
+    "uuid": 5,
+    "logging": 3,
+    "anyio": 2,
+    "collections": 2,
+    "asyncio": 2,
+    "websockets": 2,
+    "enum": 2,
+    "abc": 1,
+    "json": 1,
+    "os": 1
+  },
+  "decorators": {
+    "dataclass": 18,
+    "runtime_checkable": 12,
+    "abstractmethod": 4,
+    "property": 1
+  },
+  "type_annotations": {
+    "return_annotations": 319,
+    "docstring_count": 77,
+    "strict_mode": true,
+    "coverage": "High — nearly all functions annotated"
+  },
+  "test_patterns": {
+    "total_tests": 231,
+    "async_tests": 103,
+    "sync_tests": 128,
+    "async_ratio": "44.6%",
+    "markers": {"anyio": 103, "skip": 1, "parametrize": 1},
+    "fixtures": ["rng", "ws_port"],
+    "assertion_styles": {"assert": 407, "pytest.raises": 13, "pytest.warns": 0},
+    "layer_distribution": {"unit": 13, "integration": 6, "e2e": 4},
+    "test_class_count": 67,
+    "convention": "@pytest.mark.anyio on all async tests, PascalCase+Test naming"
+  },
+  "key_classes_detail": {
+    "AgentBase": {
+      "file": "agentforge/agent/base.py",
+      "pattern": "State Machine + Template Method",
+      "lifecycle": "init → run → stop → destroy",
+      "abstract_hooks": ["_on_init", "_on_run", "_on_stop", "_on_destroy"],
+      "lock": "anyio.Lock()"
+    },
+    "InProcessMessageBus": {
+      "file": "agentforge/bus/inprocess.py",
+      "pattern": "Observer/Pub-Sub + Facade",
+      "features": ["subscribe/unsubscribe", "publish with backpressure", "RPC via request/respond", "topic pattern matching"],
+      "queue": "asyncio.Queue",
+      "backpressure": "await queue.put (not put_nowait)"
+    },
+    "EvolutionEngine": {
+      "file": "agentforge/evoforge/engine/evolution.py",
+      "pattern": "Facade + Callback",
+      "features": ["evolve loop", "callback system", "termination strategies", "history tracking"]
+    }
+  }
+}

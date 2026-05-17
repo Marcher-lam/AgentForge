@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "dashboard-data",
+  "title": "DashboardData",
+  "description": "Evolution and RL training dashboard data schemas",
+  "oneOf": [
+    { "$ref": "#/$defs/EvolutionDashboardData" },
+    { "$ref": "#/$defs/TrainingDashboardData" }
+  ],
+  "$defs": {
+    "DataPoint": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"],
+      "additionalProperties": false
+    },
+    "EvolutionDashboardData": {
+      "type": "object",
+      "properties": {
+        "evolution_id": { "type": "string" },
+        "current_generation": { "type": "integer", "minimum": 0 },
+        "status": { "type": "string", "enum": ["running", "completed", "failed"] },
+        "fitness_curves": {
+          "type": "object",
+          "properties": {
+            "best": { "type": "array", "items": { "$ref": "#/$defs/DataPoint" } },
+            "mean": { "type": "array", "items": { "$ref": "#/$defs/DataPoint" } },
+            "std": { "type": "array", "items": { "$ref": "#/$defs/DataPoint" } }
+          },
+          "required": ["best", "mean", "std"]
+        },
+        "downsampled": { "type": "boolean" }
+      },
+      "required": ["evolution_id", "current_generation", "status", "fitness_curves", "downsampled"]
+    },
+    "TrainingDashboardData": {
+      "type": "object",
+      "properties": {
+        "task_id": { "type": "string" },
+        "algorithm": { "type": "string", "enum": ["DQN", "PPO", "MADDPG"] },
+        "current_step": { "type": "integer", "minimum": 0 },
+        "current_episode": { "type": "integer", "minimum": 0 },
+        "status": { "type": "string", "enum": ["running", "completed", "failed"] },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/DataPoint" }
+          }
+        },
+        "hyperparameters": { "type": "object" },
+        "downsampled": { "type": "boolean" }
+      },
+      "required": ["task_id", "algorithm", "current_step", "status", "metrics", "downsampled"]
+    }
+  }
+}

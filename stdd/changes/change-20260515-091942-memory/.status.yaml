@@ -1,0 +1,26 @@
+change_id: "change-20260515-091942-memory"
+title: "Memory Layer (Phase 3)"
+type: feature
+status: archived
+
+depends_on: "change-20260515-091942-core"
+created: "2026-05-15T09:19:42"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - memory-system.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 80

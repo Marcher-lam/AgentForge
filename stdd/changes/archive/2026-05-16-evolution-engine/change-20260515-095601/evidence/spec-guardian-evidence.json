@@ -1,0 +1,41 @@
+{
+  "timestamp": "2026-05-15T21:51:44.931839",
+  "project": "evolution-engine",
+  "mode": "spec-guardian --fix",
+  "dimensions": {
+    "bdd_format": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "rfc2119": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "impl_leakage": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "placeholders": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "conflicts_coverage": {
+      "status": "PASS",
+      "diagnostics": []
+    }
+  },
+  "total_diagnostics": 0,
+  "blocking": 0,
+  "warnings": 0,
+  "suggestions": 0,
+  "fixes_applied": [
+    {
+      "file": "fitness.md:25",
+      "fix": "def sync_fitness(genome) -> float → 同步适应度函数（非异步）"
+    },
+    {
+      "file": "operators.md",
+      "fix": "Added missing Replacement Strategies feature (3 scenarios: generational, steady-state, elite coexistence)"
+    }
+  ]
+}

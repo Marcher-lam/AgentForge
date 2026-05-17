@@ -1,0 +1,269 @@
+{
+  "project": "agent-core",
+  "validated_at": "2026-05-15T13:31:37.800924+00:00",
+  "spec_files": 13,
+  "scenarios": 237,
+  "blocking": 0,
+  "warnings": 19,
+  "files": [
+    {
+      "file": "change-20260515-091942/agent-lifecycle.md",
+      "scenarios": 20,
+      "shall": 42,
+      "must": 6,
+      "findings": [
+        [
+          "INFO",
+          "class name 'AgentState' in step (4x)"
+        ]
+      ],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/bus-inprocess.md",
+      "scenarios": 15,
+      "shall": 26,
+      "must": 1,
+      "findings": [
+        [
+          "INFO",
+          "class name 'Message' in step (8x)"
+        ]
+      ],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/types.md",
+      "scenarios": 11,
+      "shall": 14,
+      "must": 4,
+      "findings": [
+        [
+          "INFO",
+          "class name 'MessageBus' in step (2x)"
+        ],
+        [
+          "INFO",
+          "class name 'AgentState' in step (2x)"
+        ],
+        [
+          "INFO",
+          "class name 'Message' in step (3x)"
+        ],
+        [
+          "WARN",
+          "impl type 'dataclass' (2x)"
+        ]
+      ],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/bus-websocket.md",
+      "scenarios": 13,
+      "shall": 26,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'WebSocketMessageBus' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'Message' in step (1x)"
+        ],
+        [
+          "INFO",
+          "transport 'WebSocket' (18x — OK for API contract)"
+        ]
+      ],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/skill-system.md",
+      "scenarios": 14,
+      "shall": 21,
+      "must": 0,
+      "findings": [],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/mcp-adapter.md",
+      "scenarios": 18,
+      "shall": 28,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "transport 'JSON-RPC' (4x — OK for API contract)"
+        ],
+        [
+          "INFO",
+          "transport 'WebSocket' (4x — OK for API contract)"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 85"
+        ]
+      ],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-091942/memory-system.md",
+      "scenarios": 19,
+      "shall": 31,
+      "must": 0,
+      "findings": [],
+      "type": "ADDED"
+    },
+    {
+      "file": "change-20260515-090534/00-core-types.md",
+      "scenarios": 14,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'MessageBus' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'ToolRegistry' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'SkillRegistry' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'MemoryStore' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'AgentState' in step (2x)"
+        ],
+        [
+          "INFO",
+          "class name 'Message' in step (1x)"
+        ],
+        [
+          "WARN",
+          "impl type 'dataclass' (8x)"
+        ]
+      ],
+      "type": "UNKNOWN"
+    },
+    {
+      "file": "change-20260515-090534/01-agent-lifecycle.md",
+      "scenarios": 22,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'AgentBase' in step (3x)"
+        ],
+        [
+          "INFO",
+          "class name 'AgentState' in step (4x)"
+        ]
+      ],
+      "type": "UNKNOWN"
+    },
+    {
+      "file": "change-20260515-090534/02-communication-bus.md",
+      "scenarios": 22,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'InProcessMessageBus' in step (2x)"
+        ],
+        [
+          "INFO",
+          "class name 'WebSocketMessageBus' in step (1x)"
+        ],
+        [
+          "INFO",
+          "class name 'Message' in step (9x)"
+        ],
+        [
+          "INFO",
+          "transport 'WebSocket' (17x — OK for API contract)"
+        ]
+      ],
+      "type": "UNKNOWN"
+    },
+    {
+      "file": "change-20260515-090534/03-mcp-adapter.md",
+      "scenarios": 19,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'MCPToolRegistry' in step (2x)"
+        ],
+        [
+          "INFO",
+          "transport 'JSON-RPC' (17x — OK for API contract)"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 82"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 124"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 133"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 141"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 150"
+        ]
+      ],
+      "type": "UNKNOWN"
+    },
+    {
+      "file": "change-20260515-090534/04-skill-system.md",
+      "scenarios": 23,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "INFO",
+          "class name 'SkillRegistry' in step (1x)"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 195"
+        ],
+        [
+          "WARN",
+          "placeholder '...' at line 199"
+        ]
+      ],
+      "type": "UNKNOWN"
+    },
+    {
+      "file": "change-20260515-090534/05-memory-system.md",
+      "scenarios": 27,
+      "shall": 0,
+      "must": 0,
+      "findings": [
+        [
+          "WARN",
+          "placeholder '...' at line 177"
+        ]
+      ],
+      "type": "UNKNOWN"
+    }
+  ]
+}

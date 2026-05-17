@@ -1,0 +1,35 @@
+change_id: "change-20260515-092930"
+title: "Reinforcement Learning Engine"
+type: feature
+status: archived
+archive_reason: "Epic 拆分为 3 个独立 Change: foundation, single-agent, multi-agent"
+created: "2026-05-15T09:29:30"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: pending
+    path: specs/
+  design:
+    status: pending
+    path: design.md
+  tasks:
+    status: pending
+    path: tasks.md
+
+phases:
+  - name: "Phase 1 - Foundation"
+    description: "Env Abstraction + RL Core + TensorBoard"
+    status: pending
+  - name: "Phase 2 - Single Agent"
+    description: "DQN + PPO algorithms"
+    status: pending
+  - name: "Phase 3 - Multi Agent"
+    description: "MADDPG + Shared Buffer + Integration"
+    status: pending
+
+metrics:
+  test_coverage_target: 80
+  cartpole_target_score: 475

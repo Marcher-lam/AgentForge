@@ -1,0 +1,26 @@
+{
+  "validated_at": "2026-05-15T13:25:14.440621+00:00",
+  "projects": {
+    "agent-core": {
+      "specs": 13,
+      "scenarios": 237
+    },
+    "evolution-engine": {
+      "specs": 4,
+      "scenarios": 49
+    },
+    "rl-engine": {
+      "specs": 4,
+      "scenarios": 64
+    },
+    "frontend-ui": {
+      "specs": 3,
+      "scenarios": 51
+    }
+  },
+  "total_specs": 24,
+  "total_scenarios": 401,
+  "blocking_errors": 3,
+  "warnings": 31,
+  "fixes_applied": 11
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "rl-transition",
+  "title": "RLTransition",
+  "description": "RL environment transition (obs, action, reward, next_obs, done)",
+  "type": "object",
+  "properties": {
+    "obs": {
+      "type": "array",
+      "items": { "type": "number" },
+      "description": "Observation vector"
+    },
+    "action": {
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "array", "items": { "type": "number" } }
+      ],
+      "description": "Discrete (int) or continuous (float array) action"
+    },
+    "reward": { "type": "number" },
+    "next_obs": {
+      "type": "array",
+      "items": { "type": "number" }
+    },
+    "terminated": { "type": "boolean" },
+    "truncated": { "type": "boolean" },
+    "info": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["obs", "action", "reward", "next_obs", "terminated", "truncated"],
+  "additionalProperties": false
+}

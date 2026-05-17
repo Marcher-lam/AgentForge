@@ -1,0 +1,110 @@
+{
+  "consumer": { "name": "evolution-engine" },
+  "provider": { "name": "rl-engine" },
+  "interactions": [
+    {
+      "description": "Evolution engine uses RL training result as fitness for genome evaluation",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "PPOTrainer available with evaluated config" }],
+      "request": {
+        "method": "EVALUATE_FITNESS",
+        "body": {
+          "individual_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "decoded_hyperparams": {
+            "learning_rate": 0.0003,
+            "n_steps": 2048,
+            "batch_size": 64,
+            "epochs": 10,
+            "gamma": 0.99,
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "entropy_coef": 0.01,
+            "hidden_layers": [256, 256]
+          },
+          "evaluation": {
+            "max_steps": 10000,
+            "n_episodes": 5,
+            "seed": 42,
+            "metric": "mean_reward"
+          }
+        }
+      },
+      "response": {
+        "body": {
+          "fitness": 350.5,
+          "metric": "mean_reward",
+          "total_steps": 10000,
+          "episodes_completed": 47,
+          "episode_rewards": [21.0, 85.0, 150.0, 320.0, 475.0]
+        },
+        "matchingRules": {
+          "$.body.fitness": { "matchers": [{ "match": "type" }] },
+          "$.body.episodes_completed": { "matchers": [{ "match": "integer", "min": 0 }] }
+        }
+      }
+    },
+    {
+      "description": "Evolution engine evaluates PolicySearch genome via network weight injection",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "ActorCriticNetwork with [4,64,64,2] architecture" }],
+      "request": {
+        "method": "EVALUATE_POLICY",
+        "body": {
+          "individual_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "network_weights": [0.1, -0.2, 0.3],
+          "architecture": { "input_dim": 4, "output_dim": 2, "hidden_layers": [64, 64] },
+          "n_episodes": 5,
+          "seed": 42
+        }
+      },
+      "response": {
+        "body": {
+          "fitness": 120.5,
+          "metric": "mean_reward",
+          "episode_rewards": [85.0, 150.0, 120.0, 100.0, 147.5]
+        },
+        "matchingRules": {
+          "$.body.fitness": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Evolution engine batch-evaluates population fitness via parallel training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "Multiple PPOTrainers available" }],
+      "request": {
+        "method": "BATCH_EVALUATE",
+        "body": {
+          "individuals": [
+            { "id": "id-001", "decoded_hyperparams": { "learning_rate": 0.0003, "epochs": 10, "hidden_layers": [256, 256] } },
+            { "id": "id-002", "decoded_hyperparams": { "learning_rate": 0.001, "epochs": 5, "hidden_layers": [128, 128] } }
+          ],
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "evaluation": { "max_steps": 5000, "n_episodes": 3, "metric": "mean_reward" }
+        }
+      },
+      "response": {
+        "body": {
+          "results": [
+            { "id": "id-001", "fitness": 280.5, "episodes": 22 },
+            { "id": "id-002", "fitness": 195.0, "episodes": 18 }
+          ]
+        },
+        "matchingRules": {
+          "$.body.results": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T21:30:00Z",
+    "provider_version": "1.0.0",
+    "description": "Evolution engine consumes rl-engine for fitness evaluation: train → mean_reward as fitness, policy search via weight injection, batch population evaluation."
+  }
+}

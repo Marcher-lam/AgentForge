@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# ChromaDB data
+chroma_data/
+
+# Model checkpoints
+checkpoints/
+
+# STDD Copilot
+stdd/graph/cache/
+stdd/memory/*.bin
+stdd/evidence/
+stdd/changes/*/evidence/
+
+# Claude Code
+.claude/
+.pua/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.env.local
+
+# Logs
+*.log
+
+# Fastembed cache (large model files)
+.fastembed_cache/

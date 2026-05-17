@@ -1,0 +1,527 @@
+openapi: "3.0.3"
+info:
+  title: EvoForge Evolution Engine API
+  description: |
+    进化引擎 API，包含种群管理、进化循环控制、适应度评估和遗传算子接口。
+    支持多种基因组编码（实数/二叉/树）和多目标适应度评估。
+  version: "1.0.0"
+  contact:
+    name: EvoForge Team
+
+servers:
+  - url: "http://localhost:8081/api/v1"
+    description: 进化引擎服务器
+
+tags:
+  - name: Population
+    description: 种群管理
+  - name: Evolution
+    description: 进化循环控制
+  - name: Fitness
+    description: 适应度评估
+  - name: Callbacks
+    description: 回调与统计
+
+paths:
+  # ─── Population ───
+  /populations:
+    post:
+      tags: [Population]
+      summary: 创建种群
+      operationId: createPopulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePopulationRequest"
+      responses:
+        "201":
+          description: 种群创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopulationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+    get:
+      tags: [Population]
+      summary: 列出所有种群
+      operationId: listPopulations
+      responses:
+        "200":
+          description: 种群列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PopulationResponse"
+
+  /populations/{populationId}:
+    get:
+      tags: [Population]
+      summary: 获取种群详情
+      operationId: getPopulation
+      parameters:
+        - $ref: "#/components/parameters/PopulationId"
+      responses:
+        "200":
+          description: 种群详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopulationResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /populations/{populationId}/individuals:
+    get:
+      tags: [Population]
+      summary: 获取种群个体列表
+      operationId: getIndividuals
+      parameters:
+        - $ref: "#/components/parameters/PopulationId"
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [fitness, index, random]
+            default: fitness
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: generation
+          in: query
+          schema:
+            type: integer
+            description: 指定世代号，默认最新
+      responses:
+        "200":
+          description: 个体列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  population_id:
+                    type: string
+                    format: uuid
+                  generation:
+                    type: integer
+                  individuals:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Individual"
+
+  /populations/{populationId}/stats:
+    get:
+      tags: [Population]
+      summary: 获取种群统计
+      operationId: getPopulationStats
+      parameters:
+        - $ref: "#/components/parameters/PopulationId"
+        - name: generation
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 种群统计信息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopulationStats"
+
+  # ─── Evolution ───
+  /evolutions:
+    post:
+      tags: [Evolution]
+      summary: 创建进化任务
+      operationId: createEvolution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEvolutionRequest"
+      responses:
+        "201":
+          description: 进化任务创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolutionResponse"
+
+  /evolutions/{evolutionId}:
+    get:
+      tags: [Evolution]
+      summary: 获取进化任务状态
+      operationId: getEvolution
+      parameters:
+        - $ref: "#/components/parameters/EvolutionId"
+      responses:
+        "200":
+          description: 进化任务详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolutionResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /evolutions/{evolutionId}/start:
+    post:
+      tags: [Evolution]
+      summary: 启动进化
+      operationId: startEvolution
+      parameters:
+        - $ref: "#/components/parameters/EvolutionId"
+      responses:
+        "200":
+          description: 进化已启动
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolutionResponse"
+        "409":
+          description: 进化已在运行中
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /evolutions/{evolutionId}/stop:
+    post:
+      tags: [Evolution]
+      summary: 停止进化
+      operationId: stopEvolution
+      parameters:
+        - $ref: "#/components/parameters/EvolutionId"
+      responses:
+        "200":
+          description: 进化已停止
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvolutionResponse"
+
+  /evolutions/{evolutionId}/generations:
+    get:
+      tags: [Evolution]
+      summary: 获取世代历史
+      operationId: getGenerationHistory
+      parameters:
+        - $ref: "#/components/parameters/EvolutionId"
+        - name: from
+          in: query
+          schema:
+            type: integer
+        - name: to
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 世代历史数据
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GenerationSnapshot"
+
+  /evolutions/{evolutionId}/gene-tree:
+    get:
+      tags: [Evolution]
+      summary: 获取基因世代树
+      operationId: getGeneTree
+      parameters:
+        - $ref: "#/components/parameters/EvolutionId"
+        - name: max_depth
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: 基因树结构
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneTree"
+
+components:
+  parameters:
+    PopulationId:
+      name: populationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    EvolutionId:
+      name: evolutionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    GenomeEncoding:
+      type: string
+      enum: [REAL, BINARY, TREE]
+
+    CreatePopulationRequest:
+      type: object
+      required: [encoding, size, fitness_function]
+      properties:
+        encoding:
+          $ref: "#/components/schemas/GenomeEncoding"
+        size:
+          type: integer
+          minimum: 2
+          default: 100
+        bounds:
+          type: array
+          items:
+            type: object
+            properties:
+              min:
+                type: number
+              max:
+                type: number
+        fitness_function:
+          type: string
+          description: 适应度函数标识
+        seed:
+          type: integer
+          description: 随机种子（可复现）
+
+    PopulationResponse:
+      type: object
+      properties:
+        population_id:
+          type: string
+          format: uuid
+        encoding:
+          $ref: "#/components/schemas/GenomeEncoding"
+        size:
+          type: integer
+        generation:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        best_fitness:
+          type: number
+          nullable: true
+
+    Individual:
+      type: object
+      properties:
+        individual_id:
+          type: string
+          format: uuid
+        index:
+          type: integer
+        genome:
+          type: object
+          description: 基因组数据（编码类型决定结构）
+        fitness:
+          type: number
+          nullable: true
+        parents:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: 父代 ID
+
+    PopulationStats:
+      type: object
+      properties:
+        generation:
+          type: integer
+        best_fitness:
+          type: number
+        mean_fitness:
+          type: number
+        worst_fitness:
+          type: number
+        std_fitness:
+          type: number
+        diversity:
+          type: number
+          description: 种群多样性指标
+
+    TerminationCriteria:
+      type: object
+      properties:
+        max_generations:
+          type: integer
+          description: 最大世代数
+        fitness_threshold:
+          type: number
+          description: 目标适应度阈值
+        convergence_generations:
+          type: integer
+          description: 连续 N 代无改进视为收敛
+        convergence_threshold:
+          type: number
+          description: 适应度变化小于此值视为无改进
+
+    OperatorConfig:
+      type: object
+      properties:
+        selection:
+          type: string
+          enum: [ROULETTE, TOURNAMENT, ELITE, RANK]
+          default: TOURNAMENT
+        crossover:
+          type: string
+          enum: [SINGLE_POINT, MULTI_POINT, UNIFORM, SBX]
+          default: UNIFORM
+        crossover_rate:
+          type: number
+          default: 0.8
+        mutation:
+          type: string
+          enum: [GAUSSIAN, UNIFORM, BIT_FLIP, POLYNOMIAL]
+          default: GAUSSIAN
+        mutation_rate:
+          type: number
+          default: 0.1
+        elite_size:
+          type: integer
+          default: 0
+          description: 精英保留数量（0 = 不保留）
+
+    CreateEvolutionRequest:
+      type: object
+      required: [population_id, operators, termination]
+      properties:
+        population_id:
+          type: string
+          format: uuid
+        operators:
+          $ref: "#/components/schemas/OperatorConfig"
+        termination:
+          $ref: "#/components/schemas/TerminationCriteria"
+        callbacks:
+          type: array
+          items:
+            type: string
+          description: 回调标识列表
+
+    EvolutionResponse:
+      type: object
+      properties:
+        evolution_id:
+          type: string
+          format: uuid
+        population_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, RUNNING, PAUSED, COMPLETED, TERMINATED]
+        current_generation:
+          type: integer
+        termination_reason:
+          type: string
+          enum: [MAX_GENERATIONS, FITNESS_THRESHOLD, CONVERGENCE, MANUAL_STOP]
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    GenerationSnapshot:
+      type: object
+      properties:
+        generation:
+          type: integer
+        best_fitness:
+          type: number
+        mean_fitness:
+          type: number
+        std_fitness:
+          type: number
+        diversity:
+          type: number
+        best_individual_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+
+    GeneTree:
+      type: object
+      properties:
+        root:
+          $ref: "#/components/schemas/GeneTreeNode"
+
+    GeneTreeNode:
+      type: object
+      properties:
+        individual_id:
+          type: string
+          format: uuid
+        generation:
+          type: integer
+        fitness:
+          type: number
+        genome_summary:
+          type: object
+          description: 基因组概要
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneTreeNode"
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum:
+            [
+              POPULATION_NOT_FOUND,
+              EVOLUTION_NOT_FOUND,
+              INVALID_ENCODING,
+              INVALID_OPERATOR,
+              CONVERGENCE_DETECTED,
+              FITNESS_EVALUATION_ERROR,
+            ]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: 资源未找到
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

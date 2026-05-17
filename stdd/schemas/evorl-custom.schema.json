@@ -1,0 +1,1053 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evorl-custom",
+  "title": "EvoRLCustomWorkflow",
+  "description": "Extended EvoRL workflow with custom algorithms, pluggable fitness functions, and extensible evaluation strategies",
+  "allOf": [
+    {
+      "$ref": "evorl-workflow.schema.json"
+    },
+    {
+      "properties": {
+        "workflow_type": {
+          "oneOf": [
+            {
+              "const": "hyperparameter_optimization"
+            },
+            {
+              "const": "policy_search"
+            },
+            {
+              "const": "co_evolution"
+            },
+            {
+              "const": "custom"
+            }
+          ]
+        },
+        "custom_config": {
+          "$ref": "#/$defs/CustomWorkflowConfig"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "CustomAlgorithmConfig": {
+      "description": "User-defined RL algorithm with arbitrary hyperparameters",
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "PPO",
+              "DQN"
+            ]
+          }
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "hyperparams": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              {
+                "$ref": "#/$defs/RangeConstraint"
+              }
+            ]
+          }
+        },
+        "network_spec": {
+          "$ref": "#/$defs/NetworkSpec"
+        },
+        "entry_point": {
+          "type": "string",
+          "description": "Python import path, e.g. 'my_algo.trainer:CustomTrainer'",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_.]*:[a-zA-Z_][a-zA-Z0-9_]*$"
+        }
+      },
+      "required": [
+        "algorithm",
+        "hyperparams",
+        "entry_point"
+      ]
+    },
+    "RangeConstraint": {
+      "description": "Numeric parameter with bounded search space",
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "scale": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "log",
+            "log2"
+          ]
+        },
+        "dtype": {
+          "type": "string",
+          "enum": [
+            "float",
+            "int"
+          ]
+        }
+      },
+      "required": [
+        "value",
+        "min",
+        "max"
+      ]
+    },
+    "NetworkSpec": {
+      "description": "Neural network architecture specification",
+      "type": "object",
+      "properties": {
+        "input_dim": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "output_dim": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "linear",
+                  "lstm",
+                  "gru",
+                  "conv1d",
+                  "conv2d",
+                  "attention",
+                  "custom"
+                ]
+              },
+              "units": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "activation": {
+                "type": "string",
+                "enum": [
+                  "relu",
+                  "tanh",
+                  "sigmoid",
+                  "gelu",
+                  "swish",
+                  "none"
+                ]
+              },
+              "dropout": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "custom_type": {
+                "type": "string"
+              },
+              "kwargs": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "output_activation": {
+          "type": "string"
+        },
+        "normalize_input": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "input_dim",
+        "output_dim"
+      ]
+    },
+    "FitnessStrategy": {
+      "description": "Pluggable fitness evaluation strategy",
+      "oneOf": [
+        {
+          "title": "SingleObjective",
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "single"
+            },
+            "metric": {
+              "type": "string",
+              "enum": [
+                "mean_reward",
+                "median_reward",
+                "max_reward",
+                "success_rate",
+                "min_reward",
+                "custom"
+              ]
+            },
+            "custom_metric_fn": {
+              "type": "string",
+              "pattern": "^[a-zA-Z_][a-zA-Z0-9_.]*:[a-zA-Z_][a-zA-Z0-9_]*$"
+            },
+            "aggregation": {
+              "type": "string",
+              "enum": [
+                "mean",
+                "median",
+                "max",
+                "min",
+                "last"
+              ]
+            },
+            "transform": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "negate",
+                "log",
+                "normalize",
+                "rank",
+                "custom"
+              ]
+            },
+            "custom_transform_fn": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "metric"
+          ]
+        },
+        {
+          "title": "MultiObjective",
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "multi_objective"
+            },
+            "objectives": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "metric": {
+                    "type": "string"
+                  },
+                  "weight": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "maximize",
+                      "minimize"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "metric",
+                  "weight"
+                ]
+              },
+              "minItems": 2
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "weighted_sum",
+                "pareto",
+                "lexicographic"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "objectives"
+          ]
+        },
+        {
+          "title": "Curriculum",
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "curriculum"
+            },
+            "stages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "metric_threshold": {
+                    "type": "number"
+                  },
+                  "evaluation": {
+                    "$ref": "#//$defs/EvaluationConfig"
+                  },
+                  "fitness_strategy": {
+                    "$ref": "#/$defs/FitnessStrategy"
+                  }
+                },
+                "required": [
+                  "name",
+                  "metric_threshold",
+                  "evaluation"
+                ]
+              }
+            }
+          },
+          "required": [
+            "type",
+            "stages"
+          ]
+        }
+      ]
+    },
+    "CheckpointPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "save_every_n_generations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "save_best": {
+          "type": "boolean"
+        },
+        "max_checkpoints": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "path_template": {
+          "type": "string"
+        }
+      }
+    },
+    "ResourceBudget": {
+      "type": "object",
+      "properties": {
+        "max_wall_time_minutes": {
+          "type": "number",
+          "minimum": 1
+        },
+        "max_gpu_hours": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_cpu_cores": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_memory_gb": {
+          "type": "number",
+          "minimum": 0.5
+        },
+        "max_parallel_jobs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        }
+      }
+    },
+    "CustomWorkflowConfig": {
+      "type": "object",
+      "properties": {
+        "algorithm_config": {
+          "$ref": "#/$defs/CustomAlgorithmConfig"
+        },
+        "fitness_strategy": {
+          "$ref": "#/$defs/FitnessStrategy"
+        },
+        "checkpoint": {
+          "$ref": "#/$defs/CheckpointPolicy"
+        },
+        "resources": {
+          "$ref": "#/$defs/ResourceBudget"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "hooks": {
+          "type": "object",
+          "properties": {
+            "on_generation_start": {
+              "type": "string"
+            },
+            "on_generation_end": {
+              "type": "string"
+            },
+            "on_evaluation_start": {
+              "type": "string"
+            },
+            "on_evaluation_end": {
+              "type": "string"
+            },
+            "on_termination": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "PPOHyperparams": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "const": "PPO"
+        },
+        "learning_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.1
+        },
+        "n_steps": {
+          "type": "integer",
+          "minimum": 32,
+          "maximum": 16384
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 4096
+        },
+        "epochs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "gamma": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "gae_lambda": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "clip_range": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "entropy_coef": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.1
+        },
+        "hidden_layers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 8
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "algorithm",
+        "learning_rate",
+        "n_steps",
+        "batch_size",
+        "gamma"
+      ]
+    },
+    "DQNHyperparams": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "const": "DQN"
+        },
+        "learning_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.1
+        },
+        "buffer_size": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 4096
+        },
+        "gamma": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "target_update_freq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "target_update_type": {
+          "type": "string",
+          "enum": [
+            "hard",
+            "soft"
+          ]
+        },
+        "tau": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "epsilon_start": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "epsilon_end": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "epsilon_decay_steps": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "dueling": {
+          "type": "boolean"
+        },
+        "hidden_layers": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 8
+          },
+          "minItems": 1,
+          "maxItems": 6
+        }
+      },
+      "required": [
+        "algorithm",
+        "learning_rate",
+        "buffer_size",
+        "batch_size",
+        "gamma"
+      ]
+    },
+    "EvaluationConfig": {
+      "type": "object",
+      "properties": {
+        "env_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "n_episodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metric": {
+          "type": "string",
+          "enum": [
+            "mean_reward",
+            "median_reward",
+            "success_rate",
+            "min_reward"
+          ]
+        }
+      },
+      "required": [
+        "env_id",
+        "max_steps",
+        "n_episodes",
+        "metric"
+      ]
+    },
+    "EvolutionConfig": {
+      "type": "object",
+      "properties": {
+        "population_size": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 1000
+        },
+        "max_generations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "selection": {
+          "type": "string",
+          "enum": [
+            "tournament",
+            "roulette",
+            "rank",
+            "elite"
+          ]
+        },
+        "tournament_k": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 10
+        },
+        "crossover_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mutation_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "elite_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fitness_threshold": {
+          "type": "number"
+        },
+        "convergence_generations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "population_size",
+        "max_generations",
+        "selection",
+        "crossover_rate",
+        "mutation_rate"
+      ]
+    },
+    "HyperparameterOptimization": {
+      "description": "Evolution searches optimal RL hyperparameters \u2014 genome encodes PPO/DQN config",
+      "type": "object",
+      "properties": {
+        "workflow_type": {
+          "const": "hyperparameter_optimization"
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rl_config": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PPOHyperparams"
+            },
+            {
+              "$ref": "#/$defs/DQNHyperparams"
+            }
+          ]
+        },
+        "evolution_config": {
+          "$ref": "#/$defs/EvolutionConfig"
+        },
+        "evaluation": {
+          "$ref": "#/$defs/EvaluationConfig"
+        },
+        "search_space": {
+          "type": "object",
+          "description": "Defines which hyperparameters are evolvable and their bounds",
+          "properties": {
+            "learning_rate": {
+              "$ref": "#/$defs/Bounds"
+            },
+            "n_steps": {
+              "$ref": "#/$defs/IntBounds"
+            },
+            "batch_size": {
+              "$ref": "#/$defs/IntBounds"
+            },
+            "gamma": {
+              "$ref": "#/$defs/Bounds"
+            },
+            "hidden_layers": {
+              "type": "object",
+              "properties": {
+                "min_neurons": {
+                  "type": "integer"
+                },
+                "max_neurons": {
+                  "type": "integer"
+                },
+                "min_layers": {
+                  "type": "integer"
+                },
+                "max_layers": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "result": {
+          "$ref": "#/$defs/OptimizationResult"
+        }
+      },
+      "required": [
+        "workflow_type",
+        "workflow_id",
+        "name",
+        "status",
+        "rl_config",
+        "evolution_config",
+        "evaluation",
+        "created_at"
+      ]
+    },
+    "PolicySearch": {
+      "description": "Evolution directly evolves neural network weights as genomes",
+      "type": "object",
+      "properties": {
+        "workflow_type": {
+          "const": "policy_search"
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "network_architecture": {
+          "type": "object",
+          "properties": {
+            "input_dim": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "output_dim": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "hidden_layers": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          "required": [
+            "input_dim",
+            "output_dim"
+          ]
+        },
+        "evolution_config": {
+          "$ref": "#/$defs/EvolutionConfig"
+        },
+        "evaluation": {
+          "$ref": "#/$defs/EvaluationConfig"
+        },
+        "result": {
+          "$ref": "#/$defs/OptimizationResult"
+        }
+      },
+      "required": [
+        "workflow_type",
+        "workflow_id",
+        "name",
+        "status",
+        "network_architecture",
+        "evolution_config",
+        "evaluation",
+        "created_at"
+      ]
+    },
+    "CoEvolution": {
+      "description": "Environment and agent co-evolve \u2014 agent adapts as environment mutates",
+      "type": "object",
+      "properties": {
+        "workflow_type": {
+          "const": "co_evolution"
+        },
+        "workflow_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "agent_config": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/PPOHyperparams"
+            },
+            {
+              "$ref": "#/$defs/DQNHyperparams"
+            }
+          ]
+        },
+        "env_population_config": {
+          "$ref": "#/$defs/EvolutionConfig"
+        },
+        "agent_population_config": {
+          "$ref": "#/$defs/EvolutionConfig"
+        },
+        "evaluation": {
+          "$ref": "#/$defs/EvaluationConfig"
+        },
+        "rounds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "current_round": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "result": {
+          "$ref": "#/$defs/CoEvolutionResult"
+        }
+      },
+      "required": [
+        "workflow_type",
+        "workflow_id",
+        "name",
+        "status",
+        "agent_config",
+        "env_population_config",
+        "agent_population_config",
+        "evaluation",
+        "rounds",
+        "created_at"
+      ]
+    },
+    "Bounds": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "scale": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "log"
+          ]
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ]
+    },
+    "IntBounds": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "type": "integer"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ]
+    },
+    "OptimizationResult": {
+      "type": "object",
+      "properties": {
+        "best_fitness": {
+          "type": "number"
+        },
+        "best_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "best_hyperparams": {
+          "type": "object"
+        },
+        "total_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "termination_reason": {
+          "type": "string",
+          "enum": [
+            "MAX_GENERATIONS",
+            "FITNESS_THRESHOLD",
+            "CONVERGENCE",
+            "CANCELLED"
+          ]
+        }
+      }
+    },
+    "CoEvolutionResult": {
+      "type": "object",
+      "properties": {
+        "best_agent_fitness": {
+          "type": "number"
+        },
+        "best_env_difficulty": {
+          "type": "number"
+        },
+        "final_round": {
+          "type": "integer"
+        },
+        "fitness_history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "round": {
+                "type": "integer"
+              },
+              "agent_fitness": {
+                "type": "number"
+              },
+              "env_difficulty": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "round",
+              "agent_fitness",
+              "env_difficulty"
+            ]
+          }
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,239 @@
+# STDD Copilot Spec-Driven Schema
+# Version: 1.0
+
+name: spec-driven
+version: "1.0"
+description: STDD Copilot 默认的规格驱动开发 Schema
+
+# Artifact 定义
+artifacts:
+  - id: proposal
+    name: 提案
+    generates: proposal.md
+    requires: []  # 根节点，无依赖
+    template: |
+      # Proposal: [标题]
+
+      ## Intent
+      [为什么做这个变更]
+
+      ## Scope
+      ### In Scope
+      - [功能点]
+
+      ### Out of Scope
+      - [排除项]
+
+      ## Approach
+      [技术方案概述]
+
+      ## Success Criteria
+      - [ ] [验收条件]
+
+  - id: specs
+    name: Delta 规格
+    generates: specs/**/*.md
+    requires: [proposal]
+    template: |
+      # Delta for [Domain]
+
+      ## ADDED Requirements
+
+      ### Requirement: [需求名]
+      The system SHALL/MUST [行为描述].
+
+      #### Scenario: [场景名]
+      - GIVEN [前置条件]
+      - WHEN [触发动作]
+      - THEN [期望结果]
+
+      ## MODIFIED Requirements
+
+      ### Requirement: [需求名]
+      The system SHALL [新行为].
+      (Previously: [旧行为])
+
+      ## REMOVED Requirements
+
+      ### Requirement: [需求名]
+      (Deprecated because [原因])
+
+  - id: design
+    name: 设计文档
+    generates: design.md
+    requires: [proposal]
+    template: |
+      # Design: [标题]
+
+      ## Overview
+      [设计概述]
+
+      ## Technical Approach
+      [技术方案]
+
+      ## Architecture Decisions
+
+      ### Decision: [决策名]
+      **Context:** [背景]
+      **Decision:** [决策]
+      **Rationale:** [理由]
+      **Consequences:** [影响]
+
+      ## File Changes
+      | File | Action | Description |
+      |------|--------|-------------|
+      | path | CREATE/MODIFY/DELETE | 描述 |
+
+      ## Risks & Mitigations
+      | Risk | Likelihood | Impact | Mitigation |
+      |------|------------|--------|------------|
+      | 风险 | 概率 | 影响 | 缓解措施 |
+
+  - id: tasks
+    name: 任务列表
+    generates: tasks.md
+    requires: [specs, design]  # 需要规格和设计都完成
+    template: |
+      # Tasks
+
+      ## 1. [任务组名]
+      - [ ] 1.1 [子任务]
+      - [ ] 1.2 [子任务]
+
+      ## 2. [任务组名]
+      - [ ] 2.1 [子任务]
+      - [ ] 2.2 [子任务]
+
+      ## Progress
+      Total: X tasks
+      Completed: 0/X
+
+# Artifact 依赖图
+dependency_graph:
+  proposal:
+    requires: []
+    enables: [specs, design]
+
+  specs:
+    requires: [proposal]
+    enables: [tasks]
+
+  design:
+    requires: [proposal]
+    enables: [tasks]
+
+  tasks:
+    requires: [specs, design]
+    enables: [apply]
+
+# 执行顺序
+execution_order:
+  - proposal
+  - specs | design  # 可并行
+  - tasks
+
+# 验证规则（增强 Schema 驱动验证深度，参考 OpenSpec）
+validation:
+  proposal:
+    - field: Intent
+      required: true
+      min_length: 50
+
+    - field: Scope.In Scope
+      required: true
+      min_items: 1
+
+    - field: Scope.Out of Scope
+      required: true
+      min_items: 1
+
+    - field: Success Criteria
+      required: true
+      min_items: 2
+
+  specs:
+    - field: Requirements
+      required: true
+      min_items: 1
+
+    - field: Scenarios
+      required: true
+      min_items: 1
+
+    - field: Given/When/Then
+      required: true
+      validate:
+        each_scenario_must_have:
+          - at_least_one_given
+          - exactly_one_when
+          - at_least_one_then
+
+    - field: Coverage
+      required: true
+      validate:
+        each_in_scope_has_scenario: true
+        each_edge_case_has_scenario: true
+        error_path_coverage: true
+
+    - field: Red Line
+      required: true
+      validate:
+        no_class_names: true
+        no_table_names: true
+        no_api_urls: true
+        no_technical_terms: true
+
+  design:
+    - field: Technical Approach
+      required: true
+      min_length: 100
+
+    - field: File Changes
+      required: true
+      min_items: 1
+
+    - field: Architecture Decisions
+      required: true
+      min_items: 1
+      validate:
+        each_decision_has:
+          - context
+          - decision
+          - rationale
+
+    - field: Risks
+      required: true
+      min_items: 1
+
+  tasks:
+    - field: Tasks
+      required: true
+      min_items: 1
+      max_items: 10
+
+    - field: Dependencies
+      required: true
+      validate:
+        no_circular_dependencies: true
+        all_deps_resolvable: true
+
+    - field: Time Estimates
+      required: true
+      validate:
+        each_task_max_30min: true
+
+    - field: Test Files
+      required: true
+      validate:
+        each_task_has_test_file: true
+
+# 质量门控
+quality_gates:
+  before_apply:
+    - tasks_completed: true
+    - specs_validated: true
+
+  before_archive:
+    - all_tests_passed: true
+    - coverage_threshold: 80
+    - mutation_threshold: 80

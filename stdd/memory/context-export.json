@@ -1,0 +1,154 @@
+{
+  "meta": {
+    "project": "EvoRL",
+    "exported": "2026-05-16T01:50:00Z",
+    "total_tokens_est": 3100,
+    "token_budget": 3500
+  },
+  "tier1_foundation": {
+    "tech_stack": {
+      "backend": "Python 3.12",
+      "frontend": "TypeScript 6, React 19, Jotai, Tailwind CSS 4",
+      "rl": "PyTorch, Gymnasium",
+      "evolution": "NumPy",
+      "async": "anyio/asyncio, websockets",
+      "logging": "structlog",
+      "testing_python": "pytest, pytest-anyio, pytest-cov",
+      "testing_frontend": "vitest, @testing-library/react, Playwright",
+      "type_checking": "mypy --strict"
+    },
+    "project_structure": {
+      "agentforge": "Agent framework (types, agent, bus, infra, evoforge)",
+      "rlforge": "RL engine (algorithms/dqn, algorithms/ppo, buffers, networks, envs)",
+      "frontend": "React UI (chat, grid, monitor, dashboard)",
+      "tests": "30 Python test files (unit/integration/e2e)",
+      "stdd": "STDD methodology artifacts (changes, specs, vision, memory)"
+    },
+    "conventions": [
+      "BDD Gherkin specs (Given/When/Then, SHALL/MUST/SHOULD)",
+      "@pytest.mark.anyio on all async Python tests",
+      "Jotai atoms for frontend state, no Context/Redux",
+      "frozen dataclass (slots=True) for immutable types",
+      "Protocol (runtime_checkable) for module interfaces",
+      "STDD pipeline: proposal → specs → design → tasks → implementation"
+    ],
+    "metrics": {
+      "python_tests_passed": 228,
+      "python_tests_skipped": 9,
+      "vitest_passed": 41,
+      "total_tests": 269,
+      "python_coverage_pct": 93,
+      "app_mass": 0.278,
+      "change_records": 16,
+      "bdd_spec_files": 25
+    },
+    "constitution": {
+      "A2": "TDD Blocking - tests required",
+      "A7": "Security Blocking - no hardcoded secrets",
+      "A9": "CI/CD Blocking - full test pass required"
+    }
+  },
+  "tier2_components": {
+    "dependencies": {
+      "types": [],
+      "agent": ["types"],
+      "bus": ["types"],
+      "infra": [],
+      "rlforge": [],
+      "evoforge": [],
+      "frontend": []
+    },
+    "api_surface": {
+      "agent_core": {
+        "state_machine": "CREATED→INITIALIZED→RUNNING⇄STOPPED→DESTROYED",
+        "AgentBase": ["init()", "run()", "stop()", "destroy()", "events.on/off/emit()"],
+        "InProcessMessageBus": ["subscribe(topic, handler)→sub_id", "publish(topic, msg)", "request(topic, msg, timeout)→msg", "respond(correlation_id, msg)"],
+        "WebSocketMessageBus": ["start_server(host, port)", "connect(url)", "ws_publish(topic, msg)", "ws_subscribe(topic, handler)"],
+        "protocols_implemented": {"MessageBus": true, "ToolRegistry": false, "SkillRegistry": false, "MemoryStore": false}
+      },
+      "rl_engine": {
+        "trainers": ["DQNTrainer(env, DQNConfig).train(max_steps)", "PPOTrainer(env, PPOConfig).train(max_steps)"],
+        "buffers": ["ReplayBuffer(capacity).push(Transition).sample(batch_size)", "RolloutBuffer().push(...).compute_gae(gamma, lam)"],
+        "networks": ["MLP(input_dim, output_dim, hidden)", "DuelingQNetwork(input_dim, output_dim, hidden)", "ActorCriticNetwork(input_dim, action_dim, hidden)"]
+      },
+      "evoforge": {
+        "engine": "EvolutionEngine(fitness_fn, selection_fn, crossover_fn, mutation_fn).evolve(population)→Population",
+        "genomes": ["RealGenome(genes=np.ndarray, bounds)", "BinaryGenome(genes=np.ndarray(bool))", "TreeGenome(root=TreeNode)"],
+        "fitness": ["SimpleFitness(fn)", "WeightedMultiObjective(objectives, weights)", "PenaltyFunction(constraint, factor)"],
+        "operators": {
+          "selection": ["tournament", "roulette", "elite", "rank"],
+          "mutation": ["gaussian", "uniform", "polynomial", "bitflip"],
+          "crossover": ["sbx", "multi_point"]
+        }
+      }
+    },
+    "known_bugs": [
+      {"id": "BUG-1", "severity": "P0", "location": "websocket.py:54", "description": "subscribe frame KeyError"},
+      {"id": "RISK-1", "severity": "P1", "location": "inprocess.py vs base.py", "description": "asyncio/anyio mixing (12 vs 3 usage points)"}
+    ],
+    "quality_gaps": [
+      {"file": "crossover.py", "coverage": 57},
+      {"file": "termination.py", "coverage": 76, "cc": 12},
+      {"file": "tree.py", "coverage": 78}
+    ]
+  },
+  "tier3_features": {
+    "active_changes": [
+      {
+        "id": "change-20260516-memory-persistence",
+        "status": "ready_for_implementation",
+        "title": "Agent 记忆持久化与向量检索",
+        "specs": 5,
+        "features": 14,
+        "scenarios": 37,
+        "phases": 7,
+        "estimate_hours": 8,
+        "module": "agentforge/memory/",
+        "new_deps": ["aiosqlite", "chromadb", "sentence-transformers"]
+      },
+      {
+        "id": "change-20260516-oauth2-frontend",
+        "status": "ready_for_implementation",
+        "title": "OAuth2 认证支持",
+        "specs": 1,
+        "features": 5,
+        "scenarios": 12,
+        "phases": 9,
+        "estimate_hours": 8.5,
+        "module": "frontend/src/auth/",
+        "new_deps": ["react-router-dom v7"]
+      },
+      {
+        "id": "change-20260516-reliable-delivery",
+        "status": "fixed_needs_archive",
+        "title": "Agent 通信可靠投递机制",
+        "fixes": [
+          "inprocess.py:76 — put_nowait→await queue.put",
+          "inprocess.py:84-92 — per-message exception isolation"
+        ],
+        "new_tests": 6
+      }
+    ],
+    "prp": {
+      "id": "prp-20260516-evoforge-v2",
+      "status": "planning_complete",
+      "title": "EvoForge v2",
+      "workstreams": [
+        "Termination strategy pattern (CC=12→5)",
+        "NSGA-II Pareto multi-objective",
+        "Parallel fitness evaluation",
+        "Island migration model",
+        "Adaptive operator selection",
+        "Integration benchmarks"
+      ],
+      "estimate_hours": 16
+    },
+    "critical_path": [
+      "Fix WS subscribe bug (P0 blocker)",
+      "Memory Persistence implementation",
+      "OAuth2 frontend implementation",
+      "EvoForge v2 Phase 1 (termination refactor)",
+      "RL RewardFunction Protocol"
+    ]
+  }
+}

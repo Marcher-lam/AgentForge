@@ -1,0 +1,46 @@
+# Change Status Tracking
+change_id: "change-20260515-090534"
+title: "Multi-Agent Collaboration Framework Core Engine"
+type: feature
+status: archived
+archive_reason: "Epic 拆分为 3 个独立 Change: core, capability, memory"
+created: "2026-05-15T09:05:34"
+
+# Artifact Pipeline
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - 00-core-types.md
+      - 01-agent-lifecycle.md
+      - 02-communication-bus.md
+      - 03-mcp-adapter.md
+      - 04-skill-system.md
+      - 05-memory-system.md
+  design:
+    status: pending
+    path: design.md
+  tasks:
+    status: pending
+    path: tasks.md
+
+# Phase Tracking
+phases:
+  - name: "Phase 1 - Core Skeleton"
+    description: "Agent Base + Message Bus + Core Types"
+    status: pending
+  - name: "Phase 2 - Capability Layer"
+    description: "MCP Adapter + Skill System"
+    status: pending
+  - name: "Phase 3 - Memory Layer"
+    description: "Memory System + Integration Tests"
+    status: pending
+
+# Metrics
+metrics:
+  test_coverage_target: 80
+  max_any_type_ratio: 5

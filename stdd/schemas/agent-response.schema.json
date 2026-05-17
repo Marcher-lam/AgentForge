@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-response",
+  "title": "AgentResponse",
+  "description": "Response from an agent to a prior Action, linked via correlation_id",
+  "oneOf": [
+    {
+      "title": "SuccessResponse",
+      "type": "object",
+      "properties": {
+        "type": { "const": "success" },
+        "response_id": { "type": "string", "format": "uuid" },
+        "correlation_id": { "type": "string", "format": "uuid", "description": "Links back to the original action_id" },
+        "responder_id": { "type": "string", "format": "uuid" },
+        "original_sender_id": { "type": "string", "format": "uuid" },
+        "topic": { "type": "string", "minLength": 1 },
+        "result": {
+          "type": "object",
+          "properties": {
+            "status": { "const": "ok" },
+            "data": { "description": "Arbitrary result payload" },
+            "content_type": { "type": "string", "enum": ["text", "json", "binary", "tool_result"] }
+          },
+          "required": ["status"],
+          "additionalProperties": true
+        },
+        "processing_time_ms": { "type": "number", "minimum": 0 },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "response_id", "correlation_id", "responder_id", "original_sender_id", "topic", "result", "timestamp"],
+      "additionalProperties": false
+    },
+    {
+      "title": "ErrorResponse",
+      "type": "object",
+      "properties": {
+        "type": { "const": "error" },
+        "response_id": { "type": "string", "format": "uuid" },
+        "correlation_id": { "type": "string", "format": "uuid" },
+        "responder_id": { "type": "string", "format": "uuid" },
+        "original_sender_id": { "type": "string", "format": "uuid" },
+        "topic": { "type": "string", "minLength": 1 },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string", "minLength": 1 },
+            "details": { "type": "object", "additionalProperties": true },
+            "retryable": { "type": "boolean" }
+          },
+          "required": ["code", "message"],
+          "additionalProperties": false
+        },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "response_id", "correlation_id", "responder_id", "original_sender_id", "topic", "error", "timestamp"],
+      "additionalProperties": false
+    },
+    {
+      "title": "AckResponse",
+      "type": "object",
+      "description": "Lightweight acknowledgment for broadcast/multicast with require_ack=true",
+      "properties": {
+        "type": { "const": "ack" },
+        "response_id": { "type": "string", "format": "uuid" },
+        "correlation_id": { "type": "string", "format": "uuid" },
+        "responder_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "response_id", "correlation_id", "responder_id", "timestamp"],
+      "additionalProperties": false
+    }
+  ]
+}

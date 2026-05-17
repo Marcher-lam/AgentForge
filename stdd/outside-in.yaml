@@ -1,0 +1,126 @@
+# Outside-In TDD Configuration
+# Generated: 2026-05-15
+
+projects:
+  agent-core:
+    specs:
+      - change-20260515-090534
+      - change-20260515-091942-core
+      - change-20260515-091942-capability
+      - change-20260515-091942-memory
+    test_layers:
+      e2e:
+        status: MISSING
+        priority: P0
+        path: tests/e2e/
+        targets:
+          - test_agent_lifecycle_e2e.py: "Full agent create→init→run→publish→subscribe→stop→destroy"
+          - test_mcp_toolchain_e2e.py: "Tool register→discover→call→result roundtrip"
+      integration:
+        status: PARTIAL
+        priority: P1
+        path: tests/integration/
+        existing: [test_integration.py]
+        targets:
+          - test_agent_bus_integration.py: "Agent + InProcess bus pub/sub/filter/wildcard"
+          - test_websocket_integration.py: "Agent + WebSocket connect→publish→disconnect→reconnect"
+          - test_mcp_skill_integration.py: "MCP tool + Skill dependency resolution"
+      unit:
+        status: EXISTS
+        path: tests/unit/
+        existing: [agent/, bus/, types/]
+        count: 4
+
+  evolution-engine:
+    specs:
+      - change-20260515-095601
+    test_layers:
+      e2e:
+        status: MISSING
+        priority: P0
+        path: tests/e2e/
+        targets:
+          - test_evolve_cycle_e2e.py: "Init population→evaluate→select→crossover→mutate→replace→terminate"
+      integration:
+        status: PARTIAL
+        priority: P1
+        path: tests/integration/
+        existing: [test_evoforge_integration.py]
+        targets:
+          - test_genome_codec_integration.py: "Encode agent params→evolve→decode back"
+          - test_fitness_operators_integration.py: "Custom fitness→selection→crossover→mutation pipeline"
+      unit:
+        status: EXISTS
+        path: tests/unit/evoforge/
+        count: 4
+
+  rl-engine:
+    specs:
+      - change-20260515-092930-foundation
+      - change-20260515-092930-single-agent
+    test_layers:
+      e2e:
+        status: MISSING
+        priority: P0
+        path: tests/e2e/
+        targets:
+          - test_cartpole_train_e2e.py: "CartPole train→converge→evaluate→save→load→resume"
+      integration:
+        status: MISSING
+        priority: P1
+        path: tests/integration/
+        targets:
+          - test_buffer_network_integration.py: "Buffer→network forward→loss backward"
+          - test_trainer_callbacks_integration.py: "Train 100 steps→verify callbacks fired"
+      unit:
+        status: EXISTS
+        path: tests/unit/rlforge/
+        count: 3
+
+  frontend-ui:
+    specs:
+      - change-20260515-100923-ui-chat
+      - change-20260515-100923-ui-dashboard
+      - change-20260515-100923-ui-monitor
+    test_layers:
+      e2e:
+        status: MISSING
+        priority: P0
+        path: frontend/e2e/
+        framework: playwright
+        targets:
+          - dashboard.spec.ts: "Open dashboard→see fitness curve→switch RL tab→see reward curve"
+          - chat.spec.ts: "Open chat→send message→receive reply→multi-agent grid"
+      integration:
+        status: MISSING
+        priority: P1
+        path: frontend/src/tests/
+        targets:
+          - useWebSocket.integration.test.ts: "Mock WS→verify message rendering"
+      unit:
+        status: EXISTS
+        path: frontend/src/tests/
+        count: 7
+
+ralph_loop:
+  max_iterations: 10
+  failure_threshold: 3
+  auto_rollback: true
+  phases: [RED, GREEN, MUTATION, REFACTOR]
+
+constitution:
+  blocking_articles: [A2_TDD, A7_Security, A9_CICD]
+  active_waivers:
+    - article: A2_TDD
+      scope: "rlforge/**"
+      reason: "mutation score 74.4% < 80%"
+      expires: 2026-05-22
+
+test_commands:
+  python: "pytest tests/ -x --tb=short -q"
+  python_coverage: "pytest tests/ --cov=agentforge --cov=rlforge --cov-report=term-missing"
+  frontend: "cd frontend && npx vitest run"
+  frontend_coverage: "cd frontend && npx vitest run --coverage"
+  mutation_agent_core: "python deep_stryker.py"
+  mutation_evo: "python deep_stryker_evo.py"
+  mutation_rl: "python deep_stryker_rl.py"

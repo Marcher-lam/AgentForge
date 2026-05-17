@@ -1,0 +1,177 @@
+{
+  "consumer": { "name": "evolution-engine" },
+  "provider": { "name": "rl-engine" },
+  "interactions": [
+    {
+      "description": "Evo evaluates a RealGenome by decoding to PPO hyperparams and training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "PPOTrainer is available for CartPole-v1" }],
+      "request": {
+        "method": "TRAIN",
+        "body": {
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "hyperparams": {
+            "learning_rate": 0.0003,
+            "n_steps": 2048,
+            "batch_size": 64,
+            "gamma": 0.99,
+            "gae_lambda": 0.95,
+            "clip_range": 0.2,
+            "entropy_coef": 0.01,
+            "epochs": 10,
+            "hidden_layers": [256, 256]
+          },
+          "max_steps": 10000,
+          "seed": 42
+        },
+        "matchingRules": {
+          "$.body.algorithm": { "matchers": [{ "match": "regex", "regex": "^(PPO|DQN)$" }] },
+          "$.body.hyperparams.learning_rate": { "matchers": [{ "match": "type" }] },
+          "$.body.hyperparams.gamma": { "matchers": [{ "match": "type" }] },
+          "$.body.max_steps": { "matchers": [{ "match": "integer", "min": 100 }] }
+        }
+      },
+      "response": {
+        "body": {
+          "total_steps": 10000,
+          "episodes": 47,
+          "final_mean_reward": 350.5,
+          "all_episode_rewards": [21.0, 35.2, 52.1],
+          "checkpoint_path": null
+        },
+        "matchingRules": {
+          "$.body.total_steps": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.episodes": { "matchers": [{ "match": "integer", "min": 0 }] },
+          "$.body.final_mean_reward": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Evo evaluates a RealGenome by decoding to DQN hyperparams and training",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "DQNTrainer is available for CartPole-v1" }],
+      "request": {
+        "method": "TRAIN",
+        "body": {
+          "algorithm": "DQN",
+          "env_id": "CartPole-v1",
+          "hyperparams": {
+            "learning_rate": 0.001,
+            "buffer_size": 100000,
+            "batch_size": 64,
+            "gamma": 0.99,
+            "target_update_freq": 1000,
+            "target_update_type": "hard",
+            "epsilon_start": 1.0,
+            "epsilon_end": 0.01,
+            "epsilon_decay_steps": 50000,
+            "dueling": true,
+            "hidden_layers": [256, 256]
+          },
+          "max_steps": 10000,
+          "seed": 42
+        },
+        "matchingRules": {
+          "$.body.algorithm": { "matchers": [{ "match": "regex", "regex": "^DQN$" }] },
+          "$.body.hyperparams.buffer_size": { "matchers": [{ "match": "integer", "min": 1000 }] }
+        }
+      },
+      "response": {
+        "body": {
+          "total_steps": 10000,
+          "episodes": 85,
+          "final_mean_reward": 195.0,
+          "all_episode_rewards": [12.0, 25.5, 45.3],
+          "checkpoint_path": null
+        },
+        "matchingRules": {
+          "$.body.final_mean_reward": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    },
+    {
+      "description": "Evo uses RL training callbacks to collect fitness data",
+      "type": "Asynchronous/Message",
+      "providerStates": [{ "name": "RL trainer is running with callbacks registered" }],
+      "request": {
+        "method": "REGISTER_CALLBACK",
+        "body": {
+          "callbacks": ["on_episode_end"]
+        }
+      },
+      "response": {
+        "body": {
+          "episode": 1,
+          "total_reward": 21.0,
+          "length": 21
+        },
+        "matchingRules": {
+          "$.body.episode": { "matchers": [{ "match": "integer", "min": 1 }] },
+          "$.body.total_reward": { "matchers": [{ "match": "type" }] },
+          "$.body.length": { "matchers": [{ "match": "integer", "min": 1 }] }
+        }
+      }
+    },
+    {
+      "description": "Evo requests EnvBase observation and action space dimensions",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "GymWrapper wraps CartPole-v1" }],
+      "request": {
+        "method": "ENV_INFO",
+        "body": {
+          "env_id": "CartPole-v1"
+        }
+      },
+      "response": {
+        "body": {
+          "observation_space": { "shape": [4], "dtype": "float32" },
+          "action_space": { "type": "Discrete", "n": 2 },
+          "max_episode_steps": 500
+        },
+        "matchingRules": {
+          "$.body.observation_space.shape": { "matchers": [{ "match": "type" }] },
+          "$.body.action_space.type": { "matchers": [{ "match": "regex", "regex": "^(Discrete|Box)$" }] }
+        }
+      }
+    },
+    {
+      "description": "Evo evaluates PolicySearch genome by loading weights into network",
+      "type": "Synchronous/Request-Response",
+      "providerStates": [{ "name": "ActorCriticNetwork with [4,64,64,2] architecture" }],
+      "request": {
+        "method": "EVALUATE_POLICY",
+        "body": {
+          "algorithm": "PPO",
+          "env_id": "CartPole-v1",
+          "network_weights": [0.1, -0.2, 0.3],
+          "architecture": { "input_dim": 4, "output_dim": 2, "hidden_layers": [64, 64] },
+          "n_episodes": 5,
+          "seed": 42
+        },
+        "matchingRules": {
+          "$.body.network_weights": { "matchers": [{ "match": "type" }] },
+          "$.body.n_episodes": { "matchers": [{ "match": "integer", "min": 1 }] }
+        }
+      },
+      "response": {
+        "body": {
+          "mean_reward": 120.5,
+          "std_reward": 35.2,
+          "episode_rewards": [85.0, 150.0, 120.0, 100.0, 147.5],
+          "episode_lengths": [85, 150, 120, 100, 147]
+        },
+        "matchingRules": {
+          "$.body.mean_reward": { "matchers": [{ "match": "type" }] },
+          "$.body.episode_rewards": { "matchers": [{ "match": "type" }] }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "generated_at": "2026-05-15T20:30:00Z",
+    "provider_version": "1.0.0",
+    "description": "EvoForge consumes RL training as fitness evaluation. Evolution engine decodes genomes to RL configs, trains, and uses mean_reward as fitness score."
+  }
+}

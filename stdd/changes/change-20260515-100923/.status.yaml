@@ -1,0 +1,6 @@
+change_id: "change-20260515-100923"
+title: "Frontend Interaction UI (Epic)"
+type: feature
+status: archived
+archive_reason: "Epic 拆分为 3 个独立 Change: ui-chat, ui-monitor, ui-dashboard"
+created: "2026-05-15T10:09:23"

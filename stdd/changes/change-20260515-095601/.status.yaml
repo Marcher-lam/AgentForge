@@ -1,0 +1,35 @@
+change_id: "change-20260515-095601"
+title: "Agent Genetic Evolution Engine"
+type: feature
+status: archived
+created: "2026-05-15T09:56:01"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - genome.md
+      - fitness.md
+      - operators.md
+      - evolution-engine.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+phases:
+  - name: "Phase 1 - Core Pipeline"
+    description: "Genome + Fitness + Evolution Loop + Population"
+    status: pending
+  - name: "Phase 2 - Operators"
+    description: "Selection / Crossover / Mutation operators"
+    status: pending
+
+metrics:
+  test_coverage_target: 85

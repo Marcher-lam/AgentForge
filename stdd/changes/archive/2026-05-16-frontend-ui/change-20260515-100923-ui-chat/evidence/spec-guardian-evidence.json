@@ -1,0 +1,94 @@
+{
+  "timestamp": "2026-05-15T21:57:00.337064",
+  "project": "frontend-ui",
+  "mode": "spec-guardian --fix",
+  "dimensions": {
+    "bdd_format": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "rfc2119": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "impl_leakage": {
+      "status": "PASS",
+      "diagnostics": [
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-chat/specs/chat-panel.md",
+          "line": 143,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "WebSocket: Scenario: WebSocket 实时通信"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-chat/specs/chat-panel.md",
+          "line": 144,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "WebSocket: Given WebSocket 连接正常"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-chat/specs/chat-panel.md",
+          "line": 156,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "WebSocket: Given WebSocket 连接正常"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-dashboard/specs/dashboard.md",
+          "line": 39,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "ECharts: Then SHALL 在 ECharts 图表中追加数据点："
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-dashboard/specs/dashboard.md",
+          "line": 61,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "ECharts: Then SHALL 使用 ECharts tree 图表"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-dashboard/specs/dashboard.md",
+          "line": 154,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "LTTB: 图表 SHALL 使用 LTTB 算法保护渲染性能。"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-dashboard/specs/dashboard.md",
+          "line": 164,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "LTTB: Then SHALL 使用 LTTB 算法降采样到 10000 点"
+        },
+        {
+          "file": "stdd/changes/change-20260515-100923-ui-monitor/specs/monitor.md",
+          "line": 31,
+          "severity": "warning",
+          "rule": "IMPL-001",
+          "message": "Framer Motion: And 粒子 SHALL 使用 Framer Motion 动画"
+        }
+      ]
+    },
+    "placeholders": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "conflicts_coverage": {
+      "status": "PASS",
+      "diagnostics": []
+    }
+  },
+  "total_diagnostics": 8,
+  "blocking": 0,
+  "warnings": 8,
+  "suggestions": 0,
+  "fixes_applied": [
+    {
+      "file": "chat-panel.md",
+      "fix": "Added Connection Resilience feature (4 scenarios: disconnect prompt, auto-reconnect, retry-failed, offline message catchup)"
+    }
+  ]
+}

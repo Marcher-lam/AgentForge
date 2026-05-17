@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "created": "2026-05-16T02:10:00Z",
+  "description": "STDD Vector Store Index — lexical-hash based semantic search",
+  "collections": [
+    {
+      "name": "agent-core-architecture-decisions",
+      "file": "agent-core-adr.json",
+      "document_count": 12,
+      "topics": ["async-runtime", "data-model", "interface-design", "backpressure", "websocket", "design-pattern", "error-handling", "communication", "risk"],
+      "last_updated": "2026-05-16T02:10:00Z"
+    }
+  ],
+  "search_index": {
+    "keyword_to_doc_ids": {
+      "anyio": ["ADR-1", "PAT-1"],
+      "asyncio": ["ADR-1", "ADR-4", "RISK-1"],
+      "trio": ["ADR-1", "RISK-1"],
+      "dataclass": ["ADR-2"],
+      "frozen": ["ADR-2"],
+      "slots": ["ADR-2"],
+      "Message": ["ADR-2"],
+      "Protocol": ["ADR-3"],
+      "ABC": ["ADR-3", "PAT-2"],
+      "interface": ["ADR-3"],
+      "backpressure": ["ADR-4", "PAT-4"],
+      "queue": ["ADR-4"],
+      "drop-oldest": ["ADR-4"],
+      "delivery_failed": ["ADR-4"],
+      "websocket": ["ADR-5", "RISK-2", "RISK-3"],
+      "reconnect": ["ADR-5", "RISK-3"],
+      "session": ["ADR-5"],
+      "subscription": ["ADR-5", "RISK-3"],
+      "state-machine": ["PAT-1"],
+      "AgentState": ["PAT-1"],
+      "lifecycle": ["PAT-1", "PAT-2"],
+      "template-method": ["PAT-2"],
+      "abstractmethod": ["PAT-2"],
+      "exception": ["PAT-3"],
+      "AgentForgeError": ["PAT-3"],
+      "error-handling": ["PAT-3"],
+      "pub-sub": ["PAT-4"],
+      "observer": ["PAT-4"],
+      "topic": ["PAT-4"],
+      "RPC": ["PAT-4"],
+      "risk": ["RISK-1", "RISK-2", "RISK-3"],
+      "bug": ["RISK-2"],
+      "KeyError": ["RISK-2"],
+      "subscribe": ["RISK-2"],
+      "compatibility": ["RISK-1"],
+      "silent-failure": ["RISK-3"]
+    }
+  }
+}

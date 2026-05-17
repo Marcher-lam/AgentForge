@@ -1,0 +1,462 @@
+# NOTE: This API spec maps internal BDD types to HTTP/WS transport.
+# AgentState: CREATED maps to pre-init, INITIALIZED maps to post-init (BDD: INIT covers both).
+# MessageType: API uses transport-oriented types (TEXT/JSON/TOOL_CALL etc.),
+#   while core types use semantic types (COMMAND/EVENT/QUERY/RESPONSE/ERROR).
+# These are intentional transport-layer mappings, not conflicts.
+
+openapi: "3.0.3"
+info:
+  title: AgentForge Core API
+  description: |
+    Agent 生命周期管理 + 进程内/跨进程通信总线接口。
+    支持 Agent 的创建、初始化、运行、停止、销毁全生命周期，
+    以及基于 topic 的 pub/sub 消息通信和 RPC 请求/响应模式。
+  version: "1.0.0"
+  contact:
+    name: AgentForge Team
+
+servers:
+  - url: "http://localhost:8080/api/v1"
+    description: 本地开发服务器
+  - url: "ws://localhost:8080/ws"
+    description: WebSocket 端点
+
+tags:
+  - name: Agent Lifecycle
+    description: Agent 生命周期管理
+  - name: Message Bus
+    description: 进程内消息总线
+  - name: WebSocket Bus
+    description: 跨进程 WebSocket 通信
+
+paths:
+  # ─── Agent Lifecycle ───
+  /agents:
+    post:
+      tags: [Agent Lifecycle]
+      summary: 创建 Agent
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentRequest"
+      responses:
+        "201":
+          description: Agent 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags: [Agent Lifecycle]
+      summary: 列出所有 Agent
+      operationId: listAgents
+      parameters:
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/AgentState"
+          description: 按状态过滤
+      responses:
+        "200":
+          description: Agent 列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentResponse"
+
+  /agents/{agentId}:
+    get:
+      tags: [Agent Lifecycle]
+      summary: 获取 Agent 详情
+      operationId: getAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent 详情
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /agents/{agentId}/init:
+    post:
+      tags: [Agent Lifecycle]
+      summary: 初始化 Agent
+      operationId: initAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: 初始化成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "409":
+          description: 状态转换非法（当前状态不允许 init）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: 初始化失败（不可重试）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agents/{agentId}/run:
+    post:
+      tags: [Agent Lifecycle]
+      summary: 运行 Agent
+      operationId: runAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent 开始运行
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /agents/{agentId}/stop:
+    post:
+      tags: [Agent Lifecycle]
+      summary: 停止 Agent
+      operationId: stopAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent 已停止
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /agents/{agentId}/destroy:
+    post:
+      tags: [Agent Lifecycle]
+      summary: 销毁 Agent（幂等）
+      operationId: destroyAgent
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent 已销毁
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+
+  # ─── Message Bus (In-Process) ───
+  /bus/subscribe:
+    post:
+      tags: [Message Bus]
+      summary: 订阅 topic
+      operationId: subscribe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeRequest"
+      responses:
+        "200":
+          description: 订阅成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscribeResponse"
+
+  /bus/unsubscribe:
+    post:
+      tags: [Message Bus]
+      summary: 取消订阅（幂等）
+      operationId: unsubscribe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnsubscribeRequest"
+      responses:
+        "200":
+          description: 取消订阅成功
+
+  /bus/publish:
+    post:
+      tags: [Message Bus]
+      summary: 发布消息（fire-and-forget）
+      operationId: publish
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishRequest"
+      responses:
+        "202":
+          description: 消息已发布
+
+  /bus/request:
+    post:
+      tags: [Message Bus]
+      summary: RPC 请求/响应
+      operationId: request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RpcRequest"
+      responses:
+        "200":
+          description: RPC 响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RpcResponse"
+        "408":
+          description: RPC 超时
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─── WebSocket Bus ───
+  /ws/bus:
+    get:
+      tags: [WebSocket Bus]
+      summary: WebSocket 连接端点
+      description: |
+        WebSocket 升级端点，支持跨进程 pub/sub 通信。
+        消息格式为 JSON，包含 topic、payload、message_type 字段。
+        支持心跳（30s ping / 60s pong 超时触发重连）。
+      operationId: wsConnect
+      responses:
+        "101":
+          description: WebSocket 升级成功
+
+components:
+  parameters:
+    AgentId:
+      name: agentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Agent 唯一标识
+
+  schemas:
+    AgentState:
+      type: string
+      enum: [CREATED, INITIALIZED, RUNNING, STOPPED, DESTROYED]
+      description: |
+        Agent 状态枚举，合法转换：
+        CREATED → INITIALIZED → RUNNING ⇄ STOPPED → DESTROYED
+
+    AgentStateTransition:
+      type: object
+      properties:
+        from:
+          $ref: "#/components/schemas/AgentState"
+        to:
+          $ref: "#/components/schemas/AgentState"
+        timestamp:
+          type: string
+          format: date-time
+
+    CreateAgentRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        type:
+          type: string
+          description: Agent 类型标识
+        config:
+          type: object
+          additionalProperties: true
+          description: Agent 初始化配置
+
+    AgentResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        state:
+          $ref: "#/components/schemas/AgentState"
+        created_at:
+          type: string
+          format: date-time
+        config:
+          type: object
+          additionalProperties: true
+
+    MessageType:
+      type: string
+      enum: [TEXT, JSON, BINARY, TOOL_CALL, TOOL_RESULT, SYSTEM, DELIVERY_FAILED]
+
+    Message:
+      type: object
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        topic:
+          type: string
+          description: "topic 路径，支持通配符 (*单层, **递归)"
+        message_type:
+          $ref: "#/components/schemas/MessageType"
+        sender_id:
+          type: string
+          format: uuid
+        payload:
+          type: object
+          additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
+        correlation_id:
+          type: string
+          format: uuid
+          description: RPC 关联 ID
+
+    SubscribeRequest:
+      type: object
+      required: [topic, handler_id]
+      properties:
+        topic:
+          type: string
+          description: "支持通配符：* 单层匹配，** 递归匹配"
+        handler_id:
+          type: string
+          format: uuid
+        queue_capacity:
+          type: integer
+          default: 1000
+          description: handler 有界队列容量
+
+    SubscribeResponse:
+      type: object
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+
+    UnsubscribeRequest:
+      type: object
+      required: [subscription_id]
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+
+    PublishRequest:
+      type: object
+      required: [topic, message]
+      properties:
+        topic:
+          type: string
+        message:
+          $ref: "#/components/schemas/Message"
+
+    RpcRequest:
+      type: object
+      required: [topic, message]
+      properties:
+        topic:
+          type: string
+        message:
+          $ref: "#/components/schemas/Message"
+        timeout_ms:
+          type: integer
+          default: 5000
+          description: RPC 超时（毫秒）
+
+    RpcResponse:
+      type: object
+      properties:
+        message:
+          $ref: "#/components/schemas/Message"
+        timed_out:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          enum:
+            [
+              AGENT_NOT_FOUND,
+              INVALID_STATE_TRANSITION,
+              INIT_FAILED,
+              BUS_ERROR,
+              CONFIG_ERROR,
+              RPC_TIMEOUT,
+              DELIVERY_FAILED,
+            ]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    NotFound:
+      description: 资源未找到
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    Conflict:
+      description: 状态冲突（非法状态转换）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    InternalError:
+      description: 内部错误
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

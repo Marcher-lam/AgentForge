@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-action",
+  "title": "AgentAction",
+  "description": "A request or command sent to one or more agents via the message bus",
+  "oneOf": [
+    {
+      "title": "DirectAction",
+      "description": "Point-to-point action sent to a specific agent",
+      "type": "object",
+      "properties": {
+        "type": { "const": "direct" },
+        "action_id": { "type": "string", "format": "uuid" },
+        "sender_id": { "type": "string", "format": "uuid" },
+        "target_id": { "type": "string", "format": "uuid" },
+        "topic": { "type": "string", "minLength": 1, "pattern": "^[a-zA-Z0-9_.\\-*]+$" },
+        "action_type": {
+          "type": "string",
+          "enum": ["tool_call", "task_assign", "query", "control"]
+        },
+        "payload": { "type": "object", "additionalProperties": true },
+        "timeout_ms": { "type": "integer", "minimum": 100, "default": 5000 },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"], "default": "normal" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "action_id", "sender_id", "target_id", "topic", "action_type", "timestamp"],
+      "additionalProperties": false
+    },
+    {
+      "title": "BroadcastAction",
+      "description": "One-to-all broadcast to every subscriber on a topic",
+      "type": "object",
+      "properties": {
+        "type": { "const": "broadcast" },
+        "action_id": { "type": "string", "format": "uuid" },
+        "sender_id": { "type": "string", "format": "uuid" },
+        "topic": { "type": "string", "minLength": 1, "pattern": "^[a-zA-Z0-9_.\\-*]+$" },
+        "action_type": { "const": "broadcast" },
+        "payload": { "type": "object", "additionalProperties": true },
+        "require_ack": { "type": "boolean", "default": false },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "action_id", "sender_id", "topic", "action_type", "timestamp"],
+      "additionalProperties": false
+    },
+    {
+      "title": "MulticastAction",
+      "description": "One-to-selected-group message targeting specific agent IDs",
+      "type": "object",
+      "properties": {
+        "type": { "const": "multicast" },
+        "action_id": { "type": "string", "format": "uuid" },
+        "sender_id": { "type": "string", "format": "uuid" },
+        "target_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "minItems": 2
+        },
+        "topic": { "type": "string", "minLength": 1, "pattern": "^[a-zA-Z0-9_.\\-*]+$" },
+        "action_type": { "const": "multicast" },
+        "payload": { "type": "object", "additionalProperties": true },
+        "require_ack": { "type": "boolean", "default": false },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "action_id", "sender_id", "target_ids", "topic", "action_type", "timestamp"],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+# STDD Constitution - 9 Development Articles
+# Generated: 2026-05-15
+# Enforcement levels: blocking, warning, suggestion
+
+articles:
+  - id: 1
+    name: "Library-First"
+    priority: warning
+    enforcement: warning_prompt
+    description: "Prefer well-maintained libraries over custom implementations"
+    rules:
+      - "MUST check for existing libraries before writing custom implementations"
+      - "SHOULD use battle-tested libraries for common patterns (auth, crypto, HTTP)"
+      - "MAY write custom code when no suitable library exists"
+    check:
+      - "Scan imports for reinvented wheels"
+      - "Flag custom implementations of solved problems"
+
+  - id: 2
+    name: "TDD"
+    priority: blocking
+    enforcement: hook_blocking
+    description: "Test-Driven Development: tests before implementation"
+    rules:
+      - "MUST write failing test before implementation (RED phase)"
+      - "MUST implement minimal code to pass test (GREEN phase)"
+      - "SHOULD refactor after tests pass (REFACTOR phase)"
+      - "MUST achieve mutation score >= 80%"
+    check:
+      - "Verify test files exist before implementation files"
+      - "Run mutation testing after green phase"
+      - "Block commits without corresponding tests"
+
+  - id: 3
+    name: "Small Commits"
+    priority: warning
+    enforcement: warning_prompt
+    description: "Keep commits atomic and focused"
+    rules:
+      - "SHOULD limit each commit to one logical change"
+      - "MUST write meaningful commit messages"
+      - "SHOULD keep changes under 300 lines per commit"
+    check:
+      - "Warn on commits > 300 lines"
+      - "Check commit message quality"
+
+  - id: 4
+    name: "Code Style"
+    priority: warning
+    enforcement: hook_check
+    description: "Consistent code formatting and naming conventions"
+    rules:
+      - "MUST follow project linter configuration"
+      - "MUST use consistent naming conventions per language"
+      - "SHOULD keep functions under 50 lines"
+    check:
+      - "Run linter (eslint, ruff, mypy)"
+      - "Check naming conventions"
+      - "Flag functions > 50 lines"
+
+  - id: 5
+    name: "Documentation"
+    priority: suggestion
+    enforcement: suggestion_prompt
+    description: "Document public APIs and complex logic"
+    rules:
+      - "SHOULD document public API endpoints"
+      - "MAY add inline comments for non-obvious logic"
+      - "SHOULD keep README up to date"
+    check:
+      - "Scan public functions for docstrings"
+      - "Check API endpoint documentation"
+
+  - id: 6
+    name: "Error Handling"
+    priority: warning
+    enforcement: suggestion_prompt
+    description: "Robust error handling at system boundaries"
+    rules:
+      - "MUST handle errors at system boundaries (user input, external APIs)"
+      - "SHOULD use typed exceptions, not bare raise"
+      - "MUST NOT silently swallow exceptions"
+      - "SHOULD provide actionable error messages"
+    check:
+      - "Scan for bare except clauses"
+      - "Flag swallowed exceptions"
+      - "Check boundary input validation"
+
+  - id: 7
+    name: "Security"
+    priority: blocking
+    enforcement: hook_blocking
+    description: "Security-first development practices"
+    rules:
+      - "MUST validate all external inputs"
+      - "MUST NOT commit secrets, credentials, or API keys"
+      - "MUST sanitize user inputs to prevent injection"
+      - "MUST use parameterized queries for database access"
+      - "SHOULD follow OWASP Top 10 guidelines"
+    check:
+      - "Scan for hardcoded secrets"
+      - "Check input validation at boundaries"
+      - "Flag SQL string concatenation"
+
+  - id: 8
+    name: "Performance"
+    priority: suggestion
+    enforcement: suggestion_prompt
+    description: "Performance-aware coding practices"
+    rules:
+      - "SHOULD avoid premature optimization"
+      - "SHOULD profile before optimizing"
+      - "MAY optimize hot paths identified by profiling"
+      - "SHOULD prefer O(n) over O(n^2) for data operations"
+    check:
+      - "Flag nested loops without early termination"
+      - "Check for unnecessary data copies"
+      - "Scan for known anti-patterns"
+
+  - id: 9
+    name: "CI/CD"
+    priority: blocking
+    enforcement: ci_gate
+    description: "Continuous Integration and Delivery pipeline"
+    rules:
+      - "MUST pass all tests before merge"
+      - "MUST pass linter checks before merge"
+      - "MUST pass security scan before merge"
+      - "SHOULD automate deployment pipeline"
+      - "MUST NOT merge to main with failing CI"
+    check:
+      - "Verify CI pipeline configuration"
+      - "Check branch protection rules"
+      - "Validate test coverage threshold"

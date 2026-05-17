@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-05-15T21:54:29.863285",
+  "project": "rl-engine",
+  "mode": "spec-guardian --fix",
+  "dimensions": {
+    "bdd_format": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "rfc2119": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "impl_leakage": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "placeholders": {
+      "status": "PASS",
+      "diagnostics": []
+    },
+    "conflicts_coverage": {
+      "status": "PASS",
+      "diagnostics": []
+    }
+  },
+  "total_diagnostics": 0,
+  "blocking": 0,
+  "warnings": 0,
+  "suggestions": 0,
+  "fixes_applied": [
+    {
+      "file": "training-pipeline.md",
+      "fix": "Added missing Parallel Training feature (3 scenarios: PPO+VectorEnv, DQN+VectorEnv, single-env fallback)"
+    }
+  ]
+}

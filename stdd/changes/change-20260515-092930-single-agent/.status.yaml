@@ -1,0 +1,28 @@
+change_id: "change-20260515-092930-single-agent"
+title: "Single Agent RL (DQN + PPO)"
+type: feature
+status: archived
+depends_on: "change-20260515-092930-foundation"
+created: "2026-05-15T09:29:30"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - dqn.md
+      - ppo.md
+      - training-pipeline.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 80
+  cartpole_target_score: 475

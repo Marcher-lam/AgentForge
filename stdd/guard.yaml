@@ -1,0 +1,55 @@
+# STDD TDD Guard Configuration
+# Generated: 2026-05-15
+# Mode: STRICT (all rules blocking)
+
+active: true
+mode: strict
+
+rules:
+  test-first:
+    level: blocking
+    description: "Tests MUST be written and verified to fail (RED) before any implementation code is written"
+    check: "new test file exists and fails before corresponding source file is modified"
+    strict_override: null
+
+  minimal-impl:
+    level: blocking
+    description: "Implementation should be minimal — just enough to make tests pass (GREEN)"
+    check: "lines_added_to_source <= 2 * lines_added_to_test"
+    strict_override: "warning → blocking"
+
+  test-must-fail:
+    level: blocking
+    description: "New tests MUST fail on first run to prove they test something real"
+    check: "new test exits with non-zero before implementation"
+    strict_override: "warning → blocking"
+
+  no-skip-refactor:
+    level: blocking
+    description: "After GREEN, refactoring is MANDATORY within 3 commits"
+    check: "refactor commit or comment within 3 commits of GREEN"
+    strict_override: "suggestion → blocking"
+
+enforcement:
+  violation_action: "block_and_report"
+  require_red_evidence: true
+  require_green_evidence: true
+  require_refactor_evidence: true
+  mutation_threshold: 80
+  build_must_pass: true
+
+project_status:
+  total_tests:
+    python: 176
+    frontend: 37
+    total: 213
+  mutation_scores:
+    agent-core: 87.5%
+    evolution-engine: 100%
+    rl-engine: 74.4%
+    frontend-ui: N/A
+  verification_status:
+    agent-core: verified
+    evolution-engine: pending
+    rl-engine: pending
+    frontend-ui: pending

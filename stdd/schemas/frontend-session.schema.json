@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "frontend-session",
+  "title": "SessionResponse",
+  "description": "Chat session with agent participants",
+  "type": "object",
+  "properties": {
+    "session_id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string", "enum": ["ONE_VS_ONE", "GROUP_BROADCAST", "GROUP_MULTICAST"] },
+    "name": { "type": ["string", "null"] },
+    "agent_ids": { "type": "array", "items": { "type": "string" } },
+    "unread_count": { "type": "integer", "minimum": 0 },
+    "last_message": { "oneOf": [{ "$ref": "frontend-message.schema.json" }, { "type": "null" }] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["session_id", "type", "agent_ids", "unread_count", "created_at", "updated_at"],
+  "additionalProperties": false
+}

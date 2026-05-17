@@ -1,0 +1,157 @@
+{
+  "meta": {
+    "type": "party-mode-review",
+    "topic": "Agent-Core Design Review",
+    "participants": ["po", "architect", "developer", "tester"],
+    "date": "2026-05-16",
+    "design_ref": "stdd/changes/change-20260515-091942-core/design.md"
+  },
+  "review_summary": {
+    "verdict": "APPROVED_WITH_CONDITIONS",
+    "conditions": [
+      "Fix ADR-1/ADR-4 inconsistency (anyio declared but asyncio used in bus)",
+      "Resolve serialization.py (designed but not implemented, merged into message.py)",
+      "Clarify ADR-4 drop-oldest vs actual await-put backpressure implementation"
+    ]
+  },
+  "perspectives": {
+    "po": {
+      "role": "Product Owner",
+      "verdict": "✅ APPROVED",
+      "concerns": [
+        {
+          "id": "PO-1",
+          "severity": "medium",
+          "topic": "ADR-4 背压策略与实际实现不一致",
+          "detail": "设计文档写 drop-oldest + delivery_failed，但实际实现改为 await queue.put（背压阻塞）。两种策略的用户体验完全不同：drop-oldest 丢消息但发通知，await-put 不丢消息但可能阻塞生产者。需要明确哪种是产品决策。",
+          "recommendation": "更新 ADR-4 反映实际实现，或提供可配置策略让用户选择"
+        },
+        {
+          "id": "PO-2",
+          "severity": "low",
+          "topic": "WebSocket 重连恢复的产品体验",
+          "detail": "ADR-5 设计了服务端持久化订阅，但实际未实现（重连后订阅丢失）。对用户来说，Agent 断线重连后消息静默停止是严重的可用性问题。",
+          "recommendation": "将 ADR-5 订阅恢复列为 Phase 2 必须项，当前 P0 bug 就是此问题的根因"
+        },
+        {
+          "id": "PO-3",
+          "severity": "low",
+          "topic": "验收标准已超额完成",
+          "detail": "设计文档测试目标 ≥85%，实际达到 95%。设计文档的覆盖率目标偏保守。",
+          "recommendation": "更新设计文档覆盖率目标为 ≥90%"
+        }
+      ],
+      "summary": "设计整体满足 Phase 1 需求。核心关注是 ADR-4 背压策略的设计-实现不一致，需要更新文档对齐。"
+    },
+    "architect": {
+      "role": "Architect",
+      "verdict": "✅ APPROVED_WITH_CONDITIONS",
+      "concerns": [
+        {
+          "id": "ARCH-1",
+          "severity": "high",
+          "topic": "ADR-1 与实际实现矛盾：anyio 声明但 asyncio 使用",
+          "detail": "ADR-1 明确选择 anyio 作为 async 运行时，但 InProcessMessageBus 实际使用 asyncio.Queue、asyncio.Future、asyncio.ensure_future（12处）vs anyio 仅 3处（import + anyio.Lock ×2）。这意味着 trio backend 下系统会崩溃。这是一个架构一致性问题。",
+          "recommendation": "二选一：(a) 全面迁移到 anyio API（anyio.create_task_group 替代 ensure_future，anyio.MemoryObjectSendStream 替代 Queue），或 (b) 更新 ADR-1 为 asyncio-only 并移除 anyio 依赖。推荐 (a) 保持 trio 兼容性。"
+        },
+        {
+          "id": "ARCH-2",
+          "severity": "medium",
+          "topic": "设计文档中 serialization.py 未实现",
+          "detail": "设计文档列出了 bus/serialization.py 独立文件，但实际 Message.to_json/from_json 内联在 message.py 中。功能等价但结构不一致。",
+          "recommendation": "更新设计文档反映实际文件结构，或决定是否需要独立序列化模块"
+        },
+        {
+          "id": "ARCH-3",
+          "severity": "medium",
+          "topic": "Protocol 接口与实际使用不匹配",
+          "detail": "MemoryStore Protocol 定义为 key-value 接口（store/retrieve/delete by key），但 change-20260516-memory-persistence 设计了三层记忆系统（session-based, MemoryType 枚举）。两者不兼容。",
+          "recommendation": "在 Phase 2 开始前重设计 MemoryStore Protocol，对齐三层记忆架构"
+        },
+        {
+          "id": "ARCH-4",
+          "severity": "low",
+          "topic": "依赖图缺少 pydantic",
+          "detail": "设计文档列出 pydantic 为 optional dependency，但 pyproject.toml 未包含 pydantic。",
+          "recommendation": "移除设计文档中 pydantic 引用，或决定是否真的需要"
+        }
+      ],
+      "summary": "最严重的架构问题是 ADR-1 与实现的矛盾（asyncio/anyio 混用）。其余是文档-实现对齐问题。"
+    },
+    "developer": {
+      "role": "Developer",
+      "verdict": "✅ APPROVED",
+      "concerns": [
+        {
+          "id": "DEV-1",
+          "severity": "high",
+          "topic": "websocket.py:54 subscribe 帧解析 bug",
+          "detail": "_handle_client 在 line 54 先尝试 data[\"message\"] 解析，然后 line 57 才检查 subscribe。subscribe 帧没有 message 字段，导致 KeyError 崩溃。这是实际编码 bug，需要在 subscribe 检查之前跳过 message 解析。",
+          "code_location": "agentforge/bus/websocket.py:52-61",
+          "recommendation": "重构 _handle_client：先判断 subscribe 类型，再解析 message 字段"
+        },
+        {
+          "id": "DEV-2",
+          "severity": "medium",
+          "topic": "publish 函数 CC=11 过高",
+          "detail": "InProcessMessageBus.publish 包含 4 层嵌套逻辑：topic 匹配 → 背压处理 → 投递 → 异常处理。CC=11 超过建议阈值 10。",
+          "recommendation": "提取 _apply_backpressure() 和 _notify_delivery_failed() 子函数，降低 publish CC 至 5-6"
+        },
+        {
+          "id": "DEV-3",
+          "severity": "low",
+          "topic": "设计文档 state_machine.py 未独立",
+          "detail": "设计文档规划了独立的 state_machine.py，但实际状态转换逻辑内联在 base.py（_transition 方法）和 types/state.py（is_valid_transition 函数）。功能完整但结构与设计不一致。",
+          "recommendation": "考虑提取到独立模块以匹配设计，或更新设计文档"
+        }
+      ],
+      "summary": "实现质量整体良好（95% 覆盖率），但 websocket subscribe bug 是 P0 阻断项，publish 复杂度需要拆分。"
+    },
+    "tester": {
+      "role": "Tester",
+      "verdict": "✅ APPROVED_WITH_CONDITIONS",
+      "concerns": [
+        {
+          "id": "TEST-1",
+          "severity": "high",
+          "topic": "WebSocket 跨进程 pub/sub 集成测试被 skip",
+          "detail": "tests/integration/test_websocket_bus_integration.py::test_cross_process_pub_sub 标记为 skip。跳过原因是 'needs server-side message forwarding'。这意味着核心跨进程消息转发功能从未被测试验证。",
+          "recommendation": "修复 subscribe bug 后，启用此测试。这是验证 WebSocket Bus 可用性的关键测试。"
+        },
+        {
+          "id": "TEST-2",
+          "severity": "medium",
+          "topic": "crossover.py 覆盖率 57%",
+          "detail": "3 种交叉算子中，sbx_crossover 和 multi_point_crossover 有大段代码未被测试覆盖。57% 是全项目最低。",
+          "recommendation": "补齐 crossover 单元测试到 ≥ 85%"
+        },
+        {
+          "id": "TEST-3",
+          "severity": "medium",
+          "topic": "heartbeat 和 reconnect 路径未直接测试",
+          "detail": "websocket.py 覆盖率 88%，未覆盖行集中在 _heartbeat_loop (99-104) 和 connect 的重连逻辑。这些是生产环境最容易出问题的路径。",
+          "recommendation": "添加 heartbeat timeout 测试和 reconnect 竞争条件测试"
+        },
+        {
+          "id": "TEST-4",
+          "severity": "low",
+          "topic": "测试目标已超额完成",
+          "detail": "设计文档测试策略表列出各层覆盖率目标：types 95%, agent 90%, bus 90%/85%, infra 80%。实际达到 types 100%, agent 100%, bus 95%, infra 94%。全部超额。"
+        }
+      ],
+      "summary": "测试整体优秀（超额完成目标），但 WebSocket 集成测试 skip 和 crossover 低覆盖率是需要补齐的 gap。"
+    }
+  },
+  "action_items": [
+    {"priority": "P0", "owner": "developer", "action": "Fix websocket.py subscribe 帧解析 bug (DEV-1)", "effort": "1h"},
+    {"priority": "P1", "owner": "architect", "action": "Resolve asyncio/anyio 混用 (ARCH-1) — 选择统一运行时", "effort": "4h"},
+    {"priority": "P1", "owner": "architect", "action": "Update design doc ADR-4 to reflect await-put implementation (PO-1)", "effort": "0.5h"},
+    {"priority": "P1", "owner": "tester", "action": "Enable WS cross-process test after subscribe fix (TEST-1)", "effort": "1h"},
+    {"priority": "P2", "owner": "developer", "action": "Extract publish sub-functions to reduce CC (DEV-2)", "effort": "1h"},
+    {"priority": "P2", "owner": "architect", "action": "Redesign MemoryStore Protocol for three-layer memory (ARCH-3)", "effort": "2h"},
+    {"priority": "P2", "owner": "tester", "action": "Add crossover tests to reach 85% coverage (TEST-2)", "effort": "1h"},
+    {"priority": "P2", "owner": "tester", "action": "Add heartbeat/reconnect direct tests (TEST-3)", "effort": "1h"},
+    {"priority": "P3", "owner": "po", "action": "Update design doc coverage targets to ≥90% (PO-3)", "effort": "0.5h"},
+    {"priority": "P3", "owner": "architect", "action": "Sync design doc file structure with actual (ARCH-2, ARCH-4, DEV-3)", "effort": "0.5h"}
+  ]
+}

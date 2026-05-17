@@ -1,0 +1,28 @@
+change_id: "change-20260515-091942-core"
+title: "Core Skeleton (Phase 1)"
+type: feature
+status: confirmed
+
+created: "2026-05-15T09:19:42"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - types.md
+      - agent-lifecycle.md
+      - bus-inprocess.md
+      - bus-websocket.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 85

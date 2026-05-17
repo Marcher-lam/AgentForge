@@ -1,0 +1,25 @@
+change_id: "change-20260515-092930-multi-agent"
+title: "Multi-Agent RL (MADDPG)"
+type: feature
+status: confirmed
+depends_on: "change-20260515-092930-foundation"
+created: "2026-05-15T09:29:30"
+
+artifacts:
+  proposal:
+    status: done
+    path: proposal.md
+  specs:
+    status: done
+    path: specs/
+    files:
+      - multi-agent.md
+  design:
+    status: done
+    path: design.md
+  tasks:
+    status: done
+    path: tasks.md
+
+metrics:
+  test_coverage_target: 80

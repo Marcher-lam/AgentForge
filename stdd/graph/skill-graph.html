@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STDD Skill Graph — 2026-05-15</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; }
+  h1 { text-align: center; font-size: 1.5rem; margin-bottom: 8px; color: #38bdf8; }
+  .subtitle { text-align: center; color: #94a3b8; margin-bottom: 24px; font-size: 0.9rem; }
+  .mermaid { background: #1e293b; border-radius: 12px; padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 1200px; margin: 24px auto; }
+  .stat-card { background: #1e293b; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-card h3 { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat-card .value { font-size: 1.8rem; font-weight: 700; }
+  .stat-card .detail { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+  .green { color: #22c55e; }
+  .yellow { color: #f59e0b; }
+  .red { color: #ef4444; }
+  .blue { color: #3b82f6; }
+  .timeline { max-width: 1200px; margin: 24px auto; }
+  .timeline h2 { font-size: 1rem; color: #38bdf8; margin-bottom: 12px; }
+  .timeline-item { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #334155; font-size: 0.85rem; }
+  .timeline-item .time { color: #64748b; min-width: 60px; }
+  .timeline-item .status { min-width: 24px; }
+  .timeline-item .action { color: #e2e8f0; }
+</style>
+</head>
+<body>
+<h1>STDD Skill Dependency Graph</h1>
+<p class="subtitle">4 Projects · 9 Articles · 213 Tests · Generated 2026-05-15</p>
+
+<div class="stats">
+  <div class="stat-card">
+    <h3>Projects</h3>
+    <div class="value blue">4</div>
+    <div class="detail">agent-core · evoforge · rlforge · frontend</div>
+  </div>
+  <div class="stat-card">
+    <h3>Tests</h3>
+    <div class="value green">213</div>
+    <div class="detail">ALL GREEN · 166 Python + 37 Frontend + 10 WS</div>
+  </div>
+  <div class="stat-card">
+    <h3>Mutation</h3>
+    <div class="value yellow">87.3%</div>
+    <div class="detail">avg across 3 Python projects (threshold 80%)</div>
+  </div>
+  <div class="stat-card">
+    <h3>Constitution</h3>
+    <div class="value green">7/9</div>
+    <div class="detail">2 PASS · 1 WARN · 0 waivers active</div>
+  </div>
+</div>
+
+<div class="mermaid">
+graph LR
+  subgraph P1["Phase 1"]
+    direction TB
+    NEW["/stdd:new ✅"] --> PROP["/stdd:propose ✅"]
+    PROP --> CLAR["/stdd:clarify ✅"]
+    CLAR --> CONF["/stdd:confirm ✅"]
+  end
+
+  subgraph P2["Phase 2"]
+    direction TB
+    SPEC["/stdd:spec ✅"] --> API["/stdd:api-spec ✅"]
+    API --> PLAN["/stdd:plan ✅"]
+    PLAN --> DES["/stdd:design ✅"]
+  end
+
+  subgraph P3["Phase 3"]
+    direction TB
+    APPLY["/stdd:apply ✅"] --> RALPH["Ralph Loop ✅"]
+    RALPH --> RED["🔴 RED"]
+    RALPH --> CHECK["🔍 CHECK"]
+    RALPH --> GREEN["🟢 GREEN"]
+    RALPH --> MUT["🧪 MUTATION"]
+    RALPH --> REF["🔵 REFACTOR"]
+  end
+
+  subgraph P4["Phase 4"]
+    direction TB
+    VMUT["/stdd:mutation ✅"] --> VRFY["/stdd:verify ✅"]
+    VRFY --> GUARD["/stdd:guard ✅"]
+    GUARD --> CONST["/stdd:constitution ✅"]
+  end
+
+  CONF --> SPEC
+  DES --> APPLY
+  APPLY --> VMUT
+</div>
+
+<div class="timeline">
+  <h2>Execution Timeline</h2>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Phase 1: Proposal → Clarify → Confirm (agent-core, evoforge, rlforge, frontend-ui)</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Phase 2: Spec → API-Spec → Plan → Design (all 4 changes)</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Phase 3: Apply — agent-core 18 tasks, evoforge 30 tasks, rlforge 59 tasks, frontend 37 tests</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Mutation: agent-core 87.5% ✅ · evoforge 100% ✅ · rl-engine 74.4% ⚠️ (waived)</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Verify: 4-project compliance reports generated</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Guard: strict mode — 3/4 projects pass</span></div>
+  <div class="timeline-item"><span class="status">✅</span><span class="action">Constitution: 9 articles defined, 1 waiver active, 4 audit entries</span></div>
+</div>
+
+</body>
+</html>

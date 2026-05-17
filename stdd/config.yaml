@@ -1,0 +1,46 @@
+# STDD Copilot Configuration
+version: "1.0"
+name: "STDD-TEST"
+
+project:
+  type: "${PROJECT_TYPE:-${LANGUAGE:-typescript}}"
+  language: "${LANGUAGE:-typescript}"
+
+# Test Configuration
+test:
+  command: "${TEST_COMMAND:-npm test}"
+  runner: "unknown"
+
+# Graph Configuration
+graph:
+  max_parallel: 4
+  timeout: 3600
+  history_limit: 100
+
+# TDD Configuration
+tdd:
+  ralph_loop:
+    max_iterations: 10
+    failure_threshold: 3
+    auto_rollback: true
+
+  mutation:
+    enabled: true
+    threshold: 80
+
+# Defense Mechanisms
+defense:
+  confirm_gate:
+    enabled: true
+
+  micro_task:
+    max_tasks: 6
+    max_time_minutes: 30
+
+  failure_rollback:
+    threshold: 3
+
+# Memory System
+memory:
+  enabled: true
+  persist: true
