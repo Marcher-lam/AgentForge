@@ -635,6 +635,7 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
 
     # ── Phase 1: Memory recall (hot: ChatMemory timeline + cold: vector) ──
     memory_context = ""
+    user_query = ""  # shared with Phase 2 RAG
 
     # Hot layer: current session's compact timeline (≤800 chars)
     if chat_memory and session_id:
@@ -644,7 +645,6 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
     cold_context = ""
     if memory and transcript:
         try:
-            user_query = ""
             for line in reversed(transcript.split("\n")):
                 if line.startswith("[You]") or line.startswith("User:") or line.startswith("【You】"):
                     user_query = line.split(":", 1)[-1].strip()[:150]
@@ -675,10 +675,12 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
     # ── Phase 2: Agentic RAG — LLM decides retrieval strategy ──
     rag_context = ""
     try:
-        topic_line = transcript.split("\n")[-1][:150] if transcript else ""
+        # Use user's original question, not the last agent reply
+        rag_query = user_query if user_query else (transcript.split("\n")[-1][:150] if transcript else "")
         rag_prompt = (
             f"你是检索决策器。分析用户消息，判断是否需要检索。\n"
-            f"用户消息：{topic_line}\n\n"
+            f"用户消息：{rag_query}\n"
+            f"你的角色：{agent.name}（{agent.system_prompt[:100]}）\n\n"
             f"只输出一个字母：\n"
             f"A=需要检索知识库（专业知识/技术细节/历史数据）\n"
             f"B=需要联网搜索（最新信息/新闻/实时数据）\n"
@@ -690,16 +692,15 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
             temperature=0.0, max_tokens=4,
         ))
         decision = (rag_resp.content or "D").strip().upper()[:1]
-        search_query = topic_line
 
         if decision in ("A", "C") and knowledge:
-            kb_results = knowledge.search(str(agent.agent_id), search_query, top_k=3)
+            kb_results = knowledge.search(str(agent.agent_id), rag_query, top_k=3)
             if kb_results:
                 kb_text = "\n".join([f"- [{r['score']:.2f}] {r['content'][:200]}" for r in kb_results])
                 rag_context += f"\n\n--- 知识库检索结果 ---\n{kb_text}"
 
         if decision in ("B", "C"):
-            web_results = await _web_search(search_query, top_k=3)
+            web_results = await _web_search(rag_query, top_k=3)
             if web_results:
                 web_text = "\n".join([f"- {r['title']}: {r['snippet']}" for r in web_results])
                 rag_context += f"\n\n--- 联网搜索结果 ---\n{web_text}"
