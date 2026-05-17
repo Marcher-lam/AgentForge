@@ -58,3 +58,5 @@ Thumbs.db
 
 # Fastembed cache (large model files)
 .fastembed_cache/
+ai.json
+memory.db
