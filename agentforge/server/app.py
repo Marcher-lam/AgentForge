@@ -238,11 +238,12 @@ class EvolutionRun:
 class RLTrainingRun:
     """Real RL training using rlforge — not simulated."""
 
-    def __init__(self, run_id: str, config: dict, broadcast_fn, agent_id: str | None = None) -> None:
+    def __init__(self, run_id: str, config: dict, broadcast_fn, agent_id: str | None = None, on_complete=None) -> None:
         self.run_id = run_id
         self.config = config
         self.broadcast_fn = broadcast_fn
         self.agent_id = agent_id
+        self.on_complete = on_complete
         self.status = "idle"
         self.metrics: dict[str, list[dict]] = {"reward": [], "loss": []}
         self.current_step = 0
@@ -292,6 +293,13 @@ class RLTrainingRun:
                 save_checkpoint(trainer, ckpt_path)
             except Exception:
                 pass
+            # Write strategy back to agent (mirrors evolution writeback)
+            if self.on_complete and self.agent_id:
+                try:
+                    strategy = self._extract_strategy()
+                    self.on_complete(self.agent_id, strategy)
+                except Exception:
+                    pass
         except asyncio.CancelledError:
             self.status = "cancelled"
         except Exception as e:
@@ -303,6 +311,57 @@ class RLTrainingRun:
                 "run_id": self.run_id,
                 "status": self.status,
             })
+
+    def _extract_strategy(self) -> dict:
+        """Extract agent strategy params from RL training results."""
+        import numpy as np
+
+        rewards = [m["y"] for m in self.metrics.get("reward", [])]
+        losses = [m["y"] for m in self.metrics.get("loss", [])]
+
+        # Reward trend → conversation style tendency
+        improvement = 0.0
+        if len(rewards) >= 10:
+            third = max(1, len(rewards) // 3)
+            early = sum(rewards[:third]) / third
+            late = sum(rewards[-third:]) / third
+            improvement = late - early
+
+        # Reward stability → temperature mapping
+        # High variance = exploratory = high temperature
+        # Low variance = stable = low temperature
+        temperature = 0.7
+        if len(rewards) >= 5:
+            half = max(1, len(rewards) // 2)
+            reward_std = float(np.std(rewards[-half:]))
+            temperature = 0.3 + min(0.7, reward_std / 10)
+
+        # Algorithm traits → strategy description
+        algo_traits = {
+            "PPO": {"style": "平衡型", "detail": "兼顾探索与利用，回复全面均衡"},
+            "DQN": {"style": "经验型", "detail": "基于历史经验做决策，回复稳健可靠"},
+            "REINFORCE": {"style": "探索型", "detail": "策略梯度驱动，回复富有创意和变化"},
+        }
+        trait = algo_traits.get(self.algorithm, algo_traits["PPO"])
+
+        # Convergence → max_tokens mapping
+        # Converged (low late loss) = concise = low max_tokens
+        # Not converged = more expression space = high max_tokens
+        max_tokens = 512
+        if len(losses) >= 5:
+            third = max(1, len(losses) // 3)
+            late_loss = sum(losses[-third:]) / third
+            max_tokens = int(256 + min(768, late_loss * 50))
+
+        return {
+            "temperature": round(temperature, 2),
+            "max_tokens": max_tokens,
+            "improvement": round(improvement, 2),
+            "algorithm": self.algorithm,
+            "style": trait["style"],
+            "detail": trait["detail"],
+            "reward_trend": "上升" if improvement > 0 else "稳定",
+        }
 
 
 class AppState:
@@ -495,6 +554,15 @@ async def _check_relevance(agent, topic: str) -> bool:
         return True
 
 
+def _get_agent_temperature(agent) -> float:
+    """Read agent-specific temperature from config (RL-optimized or default 0.7)."""
+    aid = str(getattr(agent, "agent_id", ""))
+    cfg = state.agent_configs.get(aid)
+    if cfg and cfg.llm and cfg.llm.temperature is not None:
+        return cfg.llm.temperature
+    return 0.7
+
+
 async def _web_search(query: str, top_k: int = 3) -> list[dict]:
     """Search the web via DuckDuckGo HTML (zero external deps)."""
     import urllib.parse
@@ -597,7 +665,7 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
                 LLMMessage(role="system", content=agent.system_prompt),
                 LLMMessage(role="user", content=f"{instruction}{memory_context}{rag_context}\n\n--- 讨论记录 ---\n{transcript}\n\n--- 你的发言 ---"),
             ],
-            temperature=0.7, max_tokens=512 if is_relevant else 128,
+            temperature=_get_agent_temperature(agent), max_tokens=512 if is_relevant else 128,
         ))
         reply = (resp.content or "").strip()
         if reply.upper() in ("PASS", "PASS。", "PASS。", "pass"):
@@ -803,7 +871,32 @@ def create_app() -> FastAPI:
         from dataclasses import asdict
         rl_cfg = asdict(config.rl)
         run_id = str(uuid.uuid4())
-        run = RLTrainingRun(run_id, rl_cfg, state.manager.broadcast, agent_id=agent_id)
+
+        def on_rl_complete(aid: str, strategy: dict) -> None:
+            agent = state.agents.get(aid)
+            if not agent:
+                return
+
+            # 1. Update Agent's LLM parameters
+            cfg = state.agent_configs.get(aid)
+            if cfg and cfg.llm:
+                cfg.llm.temperature = strategy["temperature"]
+                cfg.llm.max_tokens = strategy["max_tokens"]
+
+            # 2. Write strategy hint to system_prompt (mirrors evolution writeback)
+            original = agent.system_prompt or ""
+            tag_start = "\n[RL策略优化]"
+            base = original.split(tag_start)[0].strip() if tag_start in original else original
+            strategy_text = (
+                f"基于{strategy['algorithm']}强化学习训练优化"
+                f"（奖励趋势：{strategy['reward_trend']}，"
+                f"风格：{strategy['style']}），"
+                f"你的对话策略为{strategy['detail']}。"
+                f"请在回复中自然体现这一策略。"
+            )
+            agent.system_prompt = f"{base}\n{tag_start} {strategy_text} [/RL策略优化]"
+
+        run = RLTrainingRun(run_id, rl_cfg, state.manager.broadcast, agent_id=agent_id, on_complete=on_rl_complete)
         state.rl_runs[run_id] = run
         run.start()
         return {"run_id": run_id, "status": "running", "agent_id": agent_id}

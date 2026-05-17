@@ -373,6 +373,14 @@ run = EvolutionRun(
 
 **Checkpoint**: 训练后自动保存到 `checkpoints/` 目录
 
+**RL 结果写回 Agent**（与进化引擎闭环一致）:
+1. 训练完成 → `_extract_strategy()` 提取策略信号
+2. 奖励方差 → temperature 映射（高方差=创意型=高 temp，低方差=稳健型=低 temp）
+3. 后期 loss → max_tokens 映射（收敛=简洁，未收敛=详细）
+4. 算法特征 → 策略描述（PPO=平衡型，DQN=经验型，REINFORCE=探索型）
+5. 写入 Agent system_prompt `[RL策略优化]` 标签 + 更新 config.llm.temperature/max_tokens
+6. `_agent_reply` 使用 Agent 级 temperature（非硬编码 0.7）
+
 **训练流程**:
 ```
 Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
