@@ -209,6 +209,10 @@ curl -X POST localhost:8000/api/mcp-servers/install-online \
 - CartPole 风格环境（4维状态，2动作）
 - 2层 MLP 策略网络 + Adam 优化器
 - 训练后自动保存 checkpoint（checkpoints/ 目录）
+- **RL 结果写回 Agent**（与进化引擎闭环一致）：
+  - 训练完成自动提取策略信号（奖励方差→temperature，loss→max_tokens，算法→风格描述）
+  - 写入 `[RL策略优化]` 标签到 system_prompt + 更新 config.llm 参数
+  - `_agent_reply` 使用 Agent 级 temperature（非硬编码）
 
 ## 记忆系统
 
@@ -218,7 +222,7 @@ curl -X POST localhost:8000/api/mcp-servers/install-online \
 |---|------|------|
 | 短期 | 内存 LRU（100 条/会话） | 最近对话上下文 |
 | 长期 | SQLite（支持 TTL） | 跨会话持久记忆 |
-| 向量 | NumPy 余弦相似度 | 语义检索 |
+| 向量 | fastembed 语义 embedding (384维) | 语义检索 |
 
 - Agent 回复前检索相关记忆注入 prompt
 - 用户消息和 Agent 回复自动存入短期+长期记忆

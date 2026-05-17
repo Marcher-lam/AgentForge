@@ -1,7 +1,7 @@
 # AgentForge — 项目全景文档
 
-> 版本: 3.0 | 更新: 2026-05-17 | 方法论: STDD
-> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统
+> 版本: 4.0 | 更新: 2026-05-17 | 方法论: STDD
+> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环
 
 ---
 
@@ -89,7 +89,7 @@ AgentForge/
 │   ├── memory/
 │   │   ├── short_term.py              # 短期记忆（LRU, OrderedDict）
 │   │   ├── long_term.py               # 长期记忆（SQLite + TTL）
-│   │   ├── vector_memory.py           # 向量记忆（NumPy 余弦相似度）
+│   │   ├── vector_memory.py           # 向量记忆（fastembed 384维语义 embedding）
 │   │   ├── knowledge_base.py          # ChromaDB 知识库（fastembed 语义 embedding）
 │   │   └── manager.py                 # 三层记忆统一门面
 │   ├── server/

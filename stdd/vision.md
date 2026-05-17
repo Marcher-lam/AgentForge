@@ -135,6 +135,8 @@ Agent 框架 (AgentForge)
 - [x] 记忆系统闭环：三层记忆（短期LRU+长期SQLite+向量）接入聊天，Agent 回复前检索相关记忆注入 prompt
 - [x] 进化结果写回：进化完成后最优基因组映射为 10 维人格特质，自动修改 Agent system_prompt
 - [x] RL DQN 修复：algo_map 映射正确，训练后自动保存 checkpoint
+- [x] RL 结果写回：训练完成自动提取策略信号写回 system_prompt + LLM 参数（temperature/max_tokens/风格描述）
+- [x] 技术债修复：WebSocket subscribe KeyError、VectorMemory 真实语义 embedding、asyncio/anyio 统一
 - [x] Agentic RAG：Per-Agent ChromaDB 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索策略
 
 ### Phase 5: 协同进化 (待开发)
@@ -164,7 +166,9 @@ Agent 框架 (AgentForge)
 | 记忆闭环 | 三层记忆读写接入聊天 | ✅ 验证通过 |
 | 进化写回 | 最优基因组映射人格特质到 prompt | ✅ 验证通过 |
 | RL 修复 | DQN 映射正确 + checkpoint 保存 | ✅ 验证通过 |
+| RL 写回 | 训练结果提取策略信号写回 Agent | ✅ 验证通过 |
 | Agentic RAG | ChromaDB + fastembed + 联网搜索 | ✅ 语义检索验证通过 |
+| 技术债修复 | WebSocket/VectorMemory/anyio | ✅ 已修复 |
 
 ## 约束与边界
 

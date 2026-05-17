@@ -1,7 +1,7 @@
 # FINAL_REQUIREMENT.md — AgentForge 全项目交付文档
 
-> 生成时间: 2026-05-16 | 更新时间: 2026-05-17 (v5) | 方法论: STDD
-> 覆盖: agent-core, evolution-engine, rl-engine, frontend-ui, per-agent-config, skill-system, mcp-management, online-install, dashboard-v2, chat-management, memory-wired, evolution-writeback, agentic-rag
+> 生成时间: 2026-05-16 | 更新时间: 2026-05-17 (v6) | 方法论: STDD
+> 覆盖: agent-core, evolution-engine, rl-engine, frontend-ui, per-agent-config, skill-system, mcp-management, online-install, dashboard-v2, chat-management, memory-wired, evolution-writeback, agentic-rag, rl-writeback
 
 ---
 
@@ -252,6 +252,8 @@
 | IMPL-12 | 进化结果写回 Agent：最优基因组映射为 system_prompt 人格修饰 | ✅ 已完成 |
 | IMPL-13 | RL DQN bug 修复 + 训练后自动保存 checkpoint | ✅ 已完成 |
 | IMPL-14 | Agentic RAG：Per-Agent ChromaDB 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索 | ✅ 已完成 |
+| IMPL-15 | RL 训练结果写回 Agent：提取策略信号（temperature/max_tokens/风格描述）→ 写回 system_prompt + LLM 参数 | ✅ 已完成 |
+| FIX-2 | WebSocket subscribe KeyError 修复 + VectorMemory 真实语义 embedding + asyncio/anyio 统一 | ✅ 已修复 |
 
 ### P2 — 优化项
 
