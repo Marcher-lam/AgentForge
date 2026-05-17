@@ -78,6 +78,7 @@ class VectorMemory:
 
     def __init__(self, persist_path: str | Path | None = None) -> None:
         self._entries: dict[str, VectorEntry] = {}
+        self._max_entries = 500  # capacity limit per agent
         self._persist_path = Path(persist_path) if persist_path else None
         if self._persist_path and self._persist_path.exists():
             self._load_from_disk()
@@ -100,14 +101,27 @@ class VectorMemory:
             metadata=metadata or {},
         )
         self._entries[entry_id] = entry
+
+        # Evict oldest entries per agent if over capacity
+        per_agent = {}
+        to_evict: list[str] = []
+        for eid, e in self._entries.items():
+            per_agent.setdefault(e.agent_id, []).append(eid)
+        for aid, eids in per_agent.items():
+            if len(eids) > self._max_entries:
+                # Remove oldest (first added = lowest id for UUID-like keys)
+                to_evict.extend(eids[:len(eids) - self._max_entries])
+        for eid in to_evict:
+            del self._entries[eid]
+
         self._maybe_persist()
         logger.debug("vector_add", agent_id=agent_id, entry_id=entry_id)
         return entry_id
 
     def search(
         self, agent_id: str, query_embedding: list[float], top_k: int = 5
-    ) -> list[VectorEntry]:
-        """Search by cosine similarity against query_embedding."""
+    ) -> list[tuple[float, VectorEntry]]:
+        """Search by cosine similarity. Returns list of (score, entry) tuples."""
         np = _get_numpy()
         q = np.array(query_embedding, dtype=np.float32)
         q_norm = np.linalg.norm(q)
@@ -127,7 +141,7 @@ class VectorMemory:
             scored.append((similarity, entry))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [entry for _, entry in scored[:top_k]]
+        return scored[:top_k]
 
     def delete(self, agent_id: str, entry_id: str) -> bool:
         """Delete a specific entry. Returns True if found and deleted."""

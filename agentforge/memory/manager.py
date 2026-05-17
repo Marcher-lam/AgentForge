@@ -102,10 +102,10 @@ class MemoryManager:
             from agentforge.memory.vector_memory import semantic_embedding
 
             query_emb = semantic_embedding(query)
-            v_entries = self.vector.search(
+            v_results = self.vector.search(
                 agent_id=agent_id, query_embedding=query_emb, top_k=top_k
             )
-            for ventry in v_entries:
+            for score, ventry in v_results:
                 mem_entry = MemoryEntry(
                     content=ventry.text,
                     session_id=ventry.agent_id,
@@ -115,10 +115,20 @@ class MemoryManager:
                     metadata=ventry.metadata,
                 )
                 results.append(
-                    SearchResult(entry=mem_entry, score=1.0, source="vector")
+                    SearchResult(entry=mem_entry, score=score, source="vector")
                 )
 
-        return results[:top_k]
+        # Sort all results by score (descending), deduplicate by content
+        results.sort(key=lambda r: r.score, reverse=True)
+        seen_content: set[str] = set()
+        deduped: list[SearchResult] = []
+        for r in results:
+            content_key = r.entry.content[:80]
+            if content_key not in seen_content:
+                seen_content.add(content_key)
+                deduped.append(r)
+
+        return deduped[:top_k]
 
     async def promote(
         self, agent_id: str, key: str, from_level: str, to_level: str
@@ -164,6 +174,10 @@ class MemoryManager:
             to_level=to_level,
         )
         return True
+
+    async def cleanup_expired(self) -> int:
+        """Remove expired long-term entries. Returns count of deleted rows."""
+        return await self.long_term.delete_expired()
 
     async def close(self) -> None:
         """Close underlying resources (e.g. SQLite connection)."""

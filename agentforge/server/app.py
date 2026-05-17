@@ -30,6 +30,7 @@ from agentforge.types.config import AgentConfig, EvolutionConfig, LLMOverride, M
 from agentforge.types.errors import SkillNotFoundError
 from agentforge.memory.manager import MemoryManager
 from agentforge.memory.knowledge_base import ChromaKnowledgeBase
+from agentforge.memory.chat_memory import ChatMemory
 
 
 class ConnectionManager:
@@ -388,6 +389,19 @@ class AppState:
         self.agent_configs: dict[str, AgentConfig] = {}
         # Unified memory system
         self.memory = MemoryManager()
+        # Per-session compact timeline memory (replaces raw short-term for context)
+        self.chat_memory = ChatMemory()
+        # Periodic cleanup of expired long-term entries (every 5 minutes)
+        async def _memory_cleanup_loop():
+            while True:
+                await asyncio.sleep(300)
+                try:
+                    deleted = await self.memory.cleanup_expired()
+                    if deleted:
+                        logger.info("memory_cleanup", deleted=deleted)
+                except Exception:
+                    pass
+        asyncio.create_task(_memory_cleanup_loop())
         # Per-agent knowledge base (ChromaDB + sentence-transformers)
         self.knowledge = ChromaKnowledgeBase()
         # Multi-provider LLM profiles: { "id": { id, name, provider, base_url, api_key, models } }
@@ -591,7 +605,7 @@ async def _web_search(query: str, top_k: int = 3) -> list[dict]:
     return results
 
 
-async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool, memory: MemoryManager | None = None, knowledge: ChromaKnowledgeBase | None = None) -> str:
+async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool, memory: MemoryManager | None = None, knowledge: ChromaKnowledgeBase | None = None, chat_memory: ChatMemory | None = None, session_id: str = "") -> str:
     """Agentic RAG: agent autonomously decides whether to search knowledge base, web, or both."""
     from agentforge.llm.protocol import LLMMessage, LLMRequest
 
@@ -619,20 +633,44 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
             f"否则只输出「PASS」。不要强行蹭话题。"
         )
 
-    # ── Phase 1: Memory recall ──
+    # ── Phase 1: Memory recall (hot: ChatMemory timeline + cold: vector) ──
     memory_context = ""
+
+    # Hot layer: current session's compact timeline (≤800 chars)
+    if chat_memory and session_id:
+        memory_context = chat_memory.get_context(session_id, agent.name, budget=800)
+
+    # Cold layer: cross-session semantic search (≤300 chars)
+    cold_context = ""
     if memory and transcript:
         try:
-            topic = transcript.split("\n")[-1][:100] if transcript else ""
+            user_query = ""
+            for line in reversed(transcript.split("\n")):
+                if line.startswith("[You]") or line.startswith("User:") or line.startswith("【You】"):
+                    user_query = line.split(":", 1)[-1].strip()[:150]
+                    break
+            if not user_query:
+                user_query = transcript.split("\n")[-1][:100] if transcript else ""
+
             results = await memory.search(
-                agent_id=str(agent.agent_id), query=topic,
-                levels=["short_term", "long_term", "vector"], top_k=5,
+                agent_id=str(agent.agent_id), query=user_query,
+                levels=["vector"], top_k=2,
             )
             if results:
-                snippets = [f"- {r.entry.content[:120]}" for r in results[:3]]
-                memory_context = "\n\n--- 相关记忆 ---\n" + "\n".join(snippets)
+                snippets = []
+                total_len = 0
+                for r in results[:2]:
+                    snippet = f"- {r.entry.content[:120]}"
+                    if total_len + len(snippet) > 300:
+                        break
+                    snippets.append(snippet)
+                    total_len += len(snippet)
+                if snippets:
+                    cold_context = "\n--- 历史相关记忆 ---\n" + "\n".join(snippets)
         except Exception:
             pass
+
+    memory_context = memory_context + cold_context
 
     # ── Phase 2: Agentic RAG — LLM decides retrieval strategy ──
     rag_context = ""
@@ -682,28 +720,45 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
             return ""
         if memory:
             try:
-                await memory.store("short_term", str(agent.agent_id), key=f"reply_{round_num}", value=reply[:500])
-                await memory.store("long_term", str(agent.agent_id), key=f"topic_{transcript[:50]}", value=reply[:500])
-                await memory.store("vector", str(agent.agent_id), key=f"vec_{round_num}", value=reply[:500])
+                # Vector: only for substantive replies (semantic index for cross-session)
+                if len(reply) > 100:
+                    await memory.store("vector", str(agent.agent_id), key=f"vec_{round_num}", value=reply[:400])
             except Exception:
                 pass
-        if knowledge:
-            try:
-                knowledge.add(str(agent.agent_id), texts=[reply[:500]], metas=[{"source": "chat", "round": round_num}])
-            except Exception:
-                pass
+        # Record to ChatMemory timeline
+        if chat_memory and session_id:
+            # Detect @mentions in reply
+            mentioned = None
+            for line in reply.split("\n"):
+                if line.startswith("@"):
+                    mentioned = line.split()[0][1:] if line.split() else None
+                    break
+            if mentioned:
+                chat_memory.record(session_id, agent.name, "@提及", reply[:60], target=mentioned)
+            else:
+                chat_memory.record(session_id, agent.name, "答", reply[:60])
+        # Knowledge base: only store user-uploaded knowledge, not chat replies
         return reply
     except Exception as e:
         return f"[Error] {e}"
 
 
-def _build_transcript(messages: list[dict], limit: int = 20) -> str:
-    """Format recent messages as a discussion transcript."""
+def _build_transcript(messages: list[dict], limit: int = 10, max_chars: int = 3000) -> str:
+    """Format recent messages as a discussion transcript with char budget."""
     lines: list[str] = []
-    for msg in messages[-limit:]:
+    total_chars = 0
+    for msg in reversed(messages[-limit:]):
         sender = msg.get("sender_name", "?")
         content = msg.get("content", "")
-        lines.append(f"【{sender}】: {content}")
+        line = f"【{sender}】: {content}"
+        if total_chars + len(line) > max_chars:
+            # Truncate this message to fit budget
+            remaining = max_chars - total_chars
+            if remaining > 50:
+                lines.insert(0, f"【{sender}】: {content[:remaining]}...")
+            break
+        lines.insert(0, line)
+        total_chars += len(line)
     return "\n".join(lines)
 
 
@@ -1399,6 +1454,8 @@ def create_app() -> FastAPI:
                     try:
                         for aid in agent_ids:
                             await state.memory.store("short_term", aid, key=f"msg_{user_msg['message_id'][:8]}", value=f"User: {content[:300]}")
+                        # Record user question to ChatMemory timeline
+                        state.chat_memory.record(session_id, "用户", "问", content[:60])
                     except Exception:
                         pass
                     if not agent_ids:
@@ -1412,7 +1469,7 @@ def create_app() -> FastAPI:
                     if len(agents) == 1:
                         aid, agent = agents[0]
                         transcript = _build_transcript(state.messages.get(session_id, []))
-                        reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge)
+                        reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
                         if reply:
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
@@ -1449,7 +1506,7 @@ def create_app() -> FastAPI:
                             if not agent:
                                 continue
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge)
+                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
                             if reply:
                                 agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                                 state.messages.setdefault(session_id, []).append(agent_msg)
@@ -1506,7 +1563,7 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge)
+                            reply = await _agent_reply(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
 
                             if not reply:
                                 continue
@@ -1562,7 +1619,7 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge)
+                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
 
                             if not reply:
                                 continue
@@ -1585,7 +1642,7 @@ def create_app() -> FastAPI:
                             continue
 
                         transcript = _build_transcript(state.messages.get(session_id, []))
-                        reply = await _agent_reply(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge)
+                        reply = await _agent_reply(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
 
                         if not reply:
                             continue

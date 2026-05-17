@@ -19,7 +19,7 @@
 | 聊天架构 | Agentic RAG（LLM 自主决策：知识库检索/联网搜索/直接回答） |
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
-| 记忆系统 | 三层（短期 LRU + 长期 SQLite + 向量 NumPy）+ 聊天读写闭环 |
+| 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
 | API 端点 | 49+ REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | 状态管理 | Jotai atoms |
@@ -87,6 +87,7 @@ AgentForge/
 │   │   ├── registry.py                # 简单工具注册表
 │   │   └── mcp_registry.py            # MCP 工具注册表（JSON Schema 校验）
 │   ├── memory/
+│   │   ├── chat_memory.py             # 时序记忆（Per-session 紧凑摘要，≤800 chars 预算）
 │   │   ├── short_term.py              # 短期记忆（LRU, OrderedDict）
 │   │   ├── long_term.py               # 长期记忆（SQLite + TTL）
 │   │   ├── vector_memory.py           # 向量记忆（fastembed 384维语义 embedding）
@@ -307,30 +308,41 @@ curl -X POST localhost:8000/api/mcp-servers/install-online \
 - 注册表: `agentforge/tools/mcp_registry.py`
 - API: `agentforge/server/app.py` → mcp-server 相关端点
 
-### 4.6 三层记忆系统
+### 4.6 双层记忆系统（严格上下文预算）
+
+**核心设计**: 紧凑摘要 + 会话隔离 + 总上下文 ≤4400 chars (≈2200 tokens)
 
 ```
 ┌───────────────────────────────────────────────────┐
-│                MemoryManager                      │
-│               (统一门面)                           │
-├───────────┬───────────────┬───────────────────────┤
-│  短期记忆  │   长期记忆     │     向量记忆          │
-│  LRU      │   SQLite      │     NumPy             │
-│  100条/会话│   支持 TTL    │  余弦相似度检索        │
-├───────────┴───────────────┴───────────────────────┤
-│  聊天闭环:                                        │
-│  1. Agent 回复前 → 检索三层记忆注入 prompt          │
-│  2. 用户消息 → 存入短期 + 长期 + 向量               │
-│  3. Agent 回复 → 存入短期 + 长期 + 向量             │
-│  4. 群聊 → 每个 Agent 独立记忆上下文               │
+│  热层: ChatMemory (Per-session 时序记忆)            │
+│  ├── 按 session_id 隔离（群聊A不污染群聊B）         │
+│  ├── 事件摘要 ≤60字（非原文500字）                  │
+│  ├── 注入 prompt 严格 ≤800 chars                    │
+│  ├── 动作类型: 问/答/@提及/PASS/共识                │
+│  └── 示例: [14:32] 前端→@程序员: 工程视角?          │
+├───────────────────────────────────────────────────┤
+│  冷层: 向量语义索引 (跨会话长尾检索)                 │
+│  ├── fastembed BAAI/bge-small-en-v1.5 (384维)      │
+│  ├── 仅存储长度>100的实质性回复                      │
+│  ├── cosine 相似度排序 + 去重                       │
+│  ├── 每 Agent 最多 500 条，自动淘汰                  │
+│  └── 注入 ≤300 chars                                │
+├───────────────────────────────────────────────────┤
+│  上下文预算控制:                                    │
+│  ├── 时序记忆 (热层): ≤800 chars                    │
+│  ├── 语义记忆 (冷层): ≤300 chars                    │
+│  ├── RAG 检索结果:   ≤1000 chars                    │
+│  ├── 讨论原文:       ≤3000 chars (最新10条)          │
+│  └── 总计:           ≤4400 chars / 2200 tokens      │
+│      (vs 旧系统 ~8400 chars / 4200 tokens)          │
 └───────────────────────────────────────────────────┘
 ```
 
 **实现位置**:
-- 短期: `agentforge/memory/short_term.py`（OrderedDict LRU）
-- 长期: `agentforge/memory/long_term.py`（SQLite + TTL 过期）
-- 向量: `agentforge/memory/vector_memory.py`（NumPy 余弦相似度）
-- 管理器: `agentforge/memory/manager.py`（统一 store/search 接口）
+- 时序记忆: `agentforge/memory/chat_memory.py`（ChatEvent + ChatMemory）
+- 向量记忆: `agentforge/memory/vector_memory.py`（NumPy + fastembed）
+- 管理器: `agentforge/memory/manager.py`（统一检索 + 去重排序）
+- 长期记忆: `agentforge/memory/long_term.py`（SQLite，周期清理 TTL 过期）
 
 ### 4.7 进化引擎（EvoForge）
 
