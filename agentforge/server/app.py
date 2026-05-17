@@ -555,11 +555,11 @@ async def _check_relevance(agent, topic: str) -> bool:
 
 
 def _get_agent_temperature(agent) -> float:
-    """Read agent-specific temperature from config (RL-optimized or default 0.7)."""
-    aid = str(getattr(agent, "agent_id", ""))
-    cfg = state.agent_configs.get(aid)
-    if cfg and cfg.llm and cfg.llm.temperature is not None:
-        return cfg.llm.temperature
+    """Read agent-specific temperature (RL-optimized or default 0.7)."""
+    # Check if agent has a config with RL-optimized temperature
+    config = getattr(agent, "_agent_config", None)
+    if config and getattr(config, "llm", None) and config.llm.temperature is not None:
+        return config.llm.temperature
     return 0.7
 
 
@@ -773,6 +773,7 @@ def create_app() -> FastAPI:
             agent_id=uuid.UUID(agent_id),
         )
         agent.skills = agent_skills
+        agent._agent_config = agent_config
         await agent.init()
         await agent.run()
         state.agents[agent_id] = agent

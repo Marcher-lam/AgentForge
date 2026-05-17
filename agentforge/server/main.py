@@ -193,6 +193,7 @@ def create_and_run():
             from agentforge.server.app import _parse_agent_config
             agent_config = _parse_agent_config(cfg_data)
             state.agent_configs[aid] = agent_config
+            agent._agent_config = agent_config
 
         # Create a default group session with all agents
         all_ids = list(state.agents.keys())
