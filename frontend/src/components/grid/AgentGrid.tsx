@@ -64,6 +64,8 @@ export function AgentGrid({ agents, apiBase, onSelect, onAgentsChanged }: AgentG
   const [allSkills, setAllSkills] = useState<{ name: string; description: string }[]>([]);
   const [editSkillIds, setEditSkillIds] = useState<string[]>([]);
   const [editMcpIds, setEditMcpIds] = useState<string[]>([]);
+  const [knowledgeUploading, setKnowledgeUploading] = useState(false);
+  const [knowledgeMessage, setKnowledgeMessage] = useState('');
 
   // Load MCP servers + LLM profiles
   useEffect(() => {
@@ -162,6 +164,29 @@ export function AgentGrid({ agents, apiBase, onSelect, onAgentsChanged }: AgentG
     onAgentsChanged?.();
   };
 
+  const handleKnowledgeJsonUpload = async (file: File) => {
+    if (!detail) return;
+    setKnowledgeUploading(true);
+    setKnowledgeMessage('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${apiBase}/api/agents/${detail.agent_id}/knowledge/upload-json`, {
+        method: 'POST',
+        body: form,
+      });
+      const data = await res.json();
+      if (data.error) {
+        setKnowledgeMessage(`上传失败：${data.error}`);
+      } else {
+        setKnowledgeMessage(`上传成功：新增 ${data.added} 条，当前共 ${data.total} 条`);
+      }
+    } catch (e) {
+      setKnowledgeMessage('上传失败：网络或文件错误');
+    } finally {
+      setKnowledgeUploading(false);
+    }
+  };
   const handleCreate = async () => {
     if (!newName.trim()) return;
     const config: Record<string, unknown> = {};
@@ -475,6 +500,33 @@ export function AgentGrid({ agents, apiBase, onSelect, onAgentsChanged }: AgentG
                   <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
                     {detail.system_prompt || '未设置'}
                   </div>
+                )}
+              </section>
+
+              {/* Knowledge JSON Upload */}
+              <section className="border rounded-xl p-3 bg-purple-50">
+                <h4 className="text-sm font-semibold text-gray-700 mb-1">专属知识库（Milvus）</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  上传预处理后的 JSON 文件。格式：{"{\"documents\":[{\"text\":\"知识内容\",\"metadata\":{\"source\":\"doc\"}}]}"}
+                </p>
+                <label className="inline-flex items-center gap-2 text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 cursor-pointer disabled:opacity-50">
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    disabled={knowledgeUploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleKnowledgeJsonUpload(file);
+                      e.currentTarget.value = '';
+                    }}
+                  />
+                  {knowledgeUploading ? '上传中...' : '上传 JSON 知识文件'}
+                </label>
+                {knowledgeMessage && (
+                  <p className={`text-xs mt-2 ${knowledgeMessage.startsWith('上传成功') ? 'text-green-600' : 'text-red-600'}`}>
+                    {knowledgeMessage}
+                  </p>
                 )}
               </section>
 

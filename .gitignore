@@ -60,3 +60,5 @@ Thumbs.db
 .fastembed_cache/
 ai.json
 memory.db
+
+milvus_data/

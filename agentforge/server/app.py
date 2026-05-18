@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from agentforge.agent.llm_agent import LLMAgent
@@ -841,6 +841,10 @@ def create_app() -> FastAPI:
         await agent.run()
         state.agents[agent_id] = agent
         state.agent_configs[agent_id] = agent_config
+        try:
+            state.knowledge.ensure_collection(agent_id)
+        except Exception:
+            pass
         return {
             "agent_id": agent_id,
             "name": name,
@@ -1306,7 +1310,7 @@ def create_app() -> FastAPI:
             "total_messages": len(messages),
         }
 
-    # ── Knowledge Base (Per-Agent ChromaDB) ──────────────
+    # ── Knowledge Base (Per-Agent Milvus) ──────────────
     @app.post("/api/agents/{agent_id}/knowledge")
     async def add_knowledge(agent_id: str, body: dict) -> dict:
         texts = body.get("texts", [])
@@ -1314,6 +1318,18 @@ def create_app() -> FastAPI:
             return {"error": "texts is required"}
         metas = body.get("metas")
         n = state.knowledge.add(agent_id, texts=texts, metas=metas)
+        return {"status": "ok", "added": n, "total": state.knowledge.count(agent_id)}
+
+    @app.post("/api/agents/{agent_id}/knowledge/upload-json")
+    async def upload_knowledge_json(agent_id: str, file: UploadFile) -> dict:
+        if not file.filename.lower().endswith(".json"):
+            return {"error": "only .json files are supported"}
+        raw = await file.read()
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            n = state.knowledge.add_json(agent_id, payload)
+        except Exception as e:
+            return {"error": f"invalid knowledge json: {e}"}
         return {"status": "ok", "added": n, "total": state.knowledge.count(agent_id)}
 
     @app.get("/api/agents/{agent_id}/knowledge/search")

@@ -309,7 +309,7 @@ Per-session 双轨设计——**共享全量记忆 + Agent 独立标记**：
 
 ## Agentic RAG（知识库 + 联网搜索）
 
-每个 Agent 独立拥有 ChromaDB 知识库（启动时自动注入 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
+每个 Agent 独立拥有 Milvus collection（创建 Agent 时自动创建对应知识库；启动时自动注入 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
 
 **三阶段流程：**
 1. **记忆检索** — ChatMemory 当前会话时序（≤800 chars）+ 向量语义跨会话检索（≤300 chars）
@@ -317,13 +317,35 @@ Per-session 双轨设计——**共享全量记忆 + Agent 独立标记**：
 3. **生成回复** — 融合记忆+知识库+联网搜索+讨论记录
 
 **技术栈：**
-- ChromaDB 持久化存储，Per-Agent collection 隔离
+- Milvus 向量数据库（`MILVUS_URI` 环境变量配置，Docker 地址先留空位，默认 `http://127.0.0.1:19530`）
+- Per-Agent collection 隔离：每创建一个 Agent 自动创建一个独立 collection
 - fastembed (BAAI/bge-small-en-v1.5) 384维真实语义 embedding
 - DuckDuckGo 联网搜索（零外部依赖）
 - 启动时自动 seed 角色专属知识（程序员→设计模式/DevOps，RL工程师→PPO/DQN...）
 
 ```bash
-# 上传知识到 Agent
+# JSON 知识文件格式（用户自行预处理）
+cat > knowledge.json <<'JSON'
+{
+  "documents": [
+    {
+      "id": "optional-stable-id",
+      "text": "知识内容正文",
+      "metadata": {
+        "source": "doc-name",
+        "title": "标题",
+        "tags": ["tag1", "tag2"]
+      }
+    }
+  ]
+}
+JSON
+
+# 上传 JSON 知识文件到指定 Agent 的 Milvus collection
+curl -X POST localhost:8000/api/agents/{id}/knowledge/upload-json \
+  -F 'file=@knowledge.json'
+
+# 兼容旧接口：直接上传 texts 数组
 curl -X POST localhost:8000/api/agents/{id}/knowledge \
   -d '{"texts":["知识文档1","知识文档2"]}'
 
@@ -434,6 +456,7 @@ cd frontend && npx tsc --noEmit
 | `LLM_MODEL` | - | 模型名称 |
 | `LLM_API_KEY` | - | API 密钥 |
 | `LLM_BASE_URL` | - | 自定义 API 地址 |
+| `MILVUS_URI` | `http://127.0.0.1:19530` | Milvus 服务地址（Docker 地址可通过此变量配置） |
 | `LLM_SYSTEM_PROMPT` | `You are a helpful AI assistant.` | 默认智能体提示词 |
 
 ## 技能开发

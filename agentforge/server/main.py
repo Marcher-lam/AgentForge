@@ -410,8 +410,12 @@ def create_and_run():
             state.agent_configs[aid] = agent_config
             agent._agent_config = agent_config
 
-            # Seed per-agent knowledge base with role-specific domain knowledge
-            _seed_knowledge(state, aid, preset["name"])
+            # Create per-agent Milvus collection and seed role-specific knowledge when MILVUS_URI is configured
+            try:
+                state.knowledge.ensure_collection(aid)
+                _seed_knowledge(state, aid, preset["name"])
+            except Exception:
+                pass
 
         # Create a default group session with all agents
         all_ids = list(state.agents.keys())

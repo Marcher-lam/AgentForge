@@ -15,7 +15,7 @@
 | 前端 | React 19 + TypeScript + Vite + TailwindCSS + Recharts |
 | RL 引擎 | PPO / DQN / REINFORCE（NumPy 真实训练） |
 | 进化引擎 | 遗传算法（锦标赛/SBX/高斯变异 + 人格优化 → 结果写回 Agent） |
-| 知识库 | ChromaDB + fastembed (BAAI/bge-small-en-v1.5, 384维语义 embedding) |
+| 知识库 | Milvus + fastembed (BAAI/bge-small-en-v1.5, 384维语义 embedding) |
 | 聊天架构 | Agentic RAG（LLM 自主决策：知识库检索/联网搜索/直接回答） |
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
@@ -33,7 +33,7 @@
 | Agent 核心 | Python 3.12 + asyncio | 异步原生，Protocol 接口 |
 | 消息通信 | asyncio + websockets | 进程内零拷贝 + 跨进程 WebSocket |
 | 记忆存储 | SQLite + NumPy vectors | 嵌入式、零运维、语义检索 |
-| 知识库 | ChromaDB + fastembed | Per-Agent collection, 启动时自动seed角色知识(8条/角色) |
+| 知识库 | Milvus + fastembed | Per-Agent collection, 创建 Agent 自动建库, JSON 文件上传 |
 | 联网搜索 | DuckDuckGo HTML | 零外部依赖 |
 | RL 训练 | NumPy | 轻量数值计算，真实 PPO/DQN |
 | 进化计算 | NumPy | 轻量遗传算法 |
@@ -91,7 +91,7 @@ AgentForge/
 │   │   ├── short_term.py              # 短期记忆（LRU, OrderedDict）
 │   │   ├── long_term.py               # 长期记忆（SQLite + TTL）
 │   │   ├── vector_memory.py           # 向量记忆（fastembed 384维语义 embedding）
-│   │   ├── knowledge_base.py          # ChromaDB 知识库（fastembed 语义 embedding）
+│   │   ├── knowledge_base.py          # Milvus 知识库（Per-Agent collection + JSON上传）
 │   │   └── manager.py                 # 三层记忆统一门面
 │   ├── server/
 │   │   ├── app.py                     # FastAPI 应用（完整后端）
@@ -188,7 +188,7 @@ AgentForge/
 
 ### 4.2 Agentic RAG（知识库 + 联网搜索）
 
-每个 Agent 独立拥有 ChromaDB 知识库（启动时自动 seed 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
+每个 Agent 独立拥有 Milvus collection（创建 Agent 时自动创建对应知识库，启动时自动 seed 8 条角色专属领域知识），聊天时遵循 Agentic RAG 范式：
 
 ```
 ┌───────────────────────────────────────────────────────┐
@@ -201,7 +201,7 @@ AgentForge/
 │  Stage 2 — Agentic 决策（LLM 根据问题+角色自主判断）     │
 │  输入: 用户原始问题 + Agent 角色信息                      │
 │  LLM 选择策略:                                         │
-│    A. 仅知识库检索 (Per-Agent ChromaDB)                  │
+│    A. 仅知识库检索 (Per-Agent Milvus collection)            │
 │    B. 仅联网搜索 (DuckDuckGo)                           │
 │    C. 知识库 + 联网搜索                                 │
 │    D. 直接回答（不需要外部信息）                          │
@@ -215,7 +215,7 @@ AgentForge/
 **实现位置**: `agentforge/server/app.py` → `_agent_reply()` 函数
 
 **技术栈**:
-- **ChromaDB**: 持久化向量数据库，Per-Agent collection 隔离
+- **Milvus**: 向量数据库，Per-Agent collection 隔离，`MILVUS_URI` 环境变量配置（默认 `http://127.0.0.1:19530`）
 - **fastembed**: BAAI/bge-small-en-v1.5, 384维 ONNX 语义 embedding（无需 PyTorch）
 - **DuckDuckGo**: HTML 搜索，urllib 实现，零外部依赖
 
@@ -223,7 +223,8 @@ AgentForge/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/agents/{id}/knowledge` | 上传知识文档（texts 数组） |
+| POST | `/api/agents/{id}/knowledge` | 兼容旧接口：上传 texts 数组 |
+| POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件（用户预处理 documents 格式） |
 | GET | `/api/agents/{id}/knowledge/search?q=关键词` | 语义检索知识 |
 
 ### 4.3 Per-Agent 独立配置
@@ -442,7 +443,8 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/agents/{id}/knowledge` | 上传知识文档（texts 数组） |
+| POST | `/api/agents/{id}/knowledge` | 兼容旧接口：上传 texts 数组 |
+| POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件（用户预处理 documents 格式） |
 | GET | `/api/agents/{id}/knowledge/search` | 语义检索知识（?q=关键词&top_k=5） |
 
 ### 5.3 LLM Profile 管理
@@ -529,6 +531,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | `LLM_MODEL` | — | 模型名称 |
 | `LLM_API_KEY` | — | API 密钥 |
 | `LLM_BASE_URL` | — | 自定义 API 地址 |
+| `MILVUS_URI` | `http://127.0.0.1:19530` | Milvus 服务地址（Docker 地址先留空位，可用环境变量覆盖） |
 | `LLM_SYSTEM_PROMPT` | `You are a helpful AI assistant.` | 默认智能体提示词 |
 
 ---
@@ -605,7 +608,7 @@ python -m pytest tests/ -v
 | 技能互操作 | SKILL.md 标准格式，与 OpenClaw 生态双向零转换 |
 | 记忆闭环 | 三层记忆接入聊天，Agent 回复前检索 + 回复后存储 |
 | 进化闭环 | 最优基因组 → 人格特质 → system_prompt 写回 |
-| RAG 闭环 | Per-Agent ChromaDB + fastembed + 联网搜索 + LLM 自主决策 |
+| RAG 闭环 | Per-Agent Milvus collection + fastembed + JSON上传 + 联网搜索 + LLM 自主决策 |
 | 数据可视化 | Recharts 双 Y 轴图表 + LTTB 降采样 + 进化树 SVG + 热力图 |
 
 ---
