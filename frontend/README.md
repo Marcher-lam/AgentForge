@@ -24,7 +24,7 @@ npx vite --host 0.0.0.0 --port 5173
 | 包 | 用途 |
 |----|------|
 | React 19 | UI 框架 |
-| Jotai | 状态管理（atoms.ts） |
+| Jotai | 状态管理（atoms/index.ts） |
 | Recharts | 数据可视化（折线图/面积图/双 Y 轴） |
 | TailwindCSS | 样式 |
 | LTTB | 大数据集降采样（utils/lttb.ts） |

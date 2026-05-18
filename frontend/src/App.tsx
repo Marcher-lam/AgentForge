@@ -31,6 +31,7 @@ function AppContent() {
   const [newSessionName, setNewSessionName] = useState('');
   const [sessionType, setSessionType] = useState<'single' | 'group'>('single');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showMembers, setShowMembers] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   const [sessions, setSessions] = useAtom(sessionsAtom);
@@ -40,6 +41,12 @@ function AppContent() {
   const [monitorMessages] = useAtom(monitorMessagesAtom);
   const [monitorPaused, setMonitorPaused] = useAtom(monitorPausedAtom);
   const messages = activeSession ? messageMap.get(activeSession) || [] : [];
+
+  // Agents in the active session (for @mention filtering)
+  const activeSessionData = sessions.find((s) => s.session_id === activeSession);
+  const sessionAgents = activeSessionData
+    ? agents.filter((a) => activeSessionData.agent_ids.includes(a.agent_id))
+    : [];
 
   // WebSocket connection
   useEffect(() => {
@@ -163,6 +170,38 @@ function AppContent() {
       a.download = `chat-${sessionName}-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
+
+  const handleAddMember = async (sessionId: string, agentId: string) => {
+    try {
+      await fetch(`${API_BASE}/api/sessions/${sessionId}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId }),
+      });
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.session_id === sessionId
+            ? { ...s, agent_ids: [...s.agent_ids, agentId], updated_at: new Date().toISOString() }
+            : s
+        )
+      );
+    } catch { /* ignore */ }
+  };
+
+  const handleRemoveMember = async (sessionId: string, agentId: string) => {
+    try {
+      await fetch(`${API_BASE}/api/sessions/${sessionId}/members/${agentId}`, {
+        method: 'DELETE',
+      });
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.session_id === sessionId
+            ? { ...s, agent_ids: s.agent_ids.filter((id) => id !== agentId), updated_at: new Date().toISOString() }
+            : s
+        )
+      );
     } catch { /* ignore */ }
   };
 
@@ -344,19 +383,22 @@ function AppContent() {
                 <p className="text-xs text-gray-400 p-4">暂无会话——点击「+ 新建」创建</p>
               )}
             </aside>
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col relative">
               {activeSession && (
                 <div className="flex items-center justify-between px-4 py-2 border-b bg-white">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">
-                      {sessions.find((s) => s.session_id === activeSession)?.name || '对话'}
+                      {activeSessionData?.name || '对话'}
                     </span>
-                    {(() => {
-                      const s = sessions.find((s) => s.session_id === activeSession);
-                      return s && s.agent_ids.length > 1 ? (
-                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">群聊 · {s.agent_ids.length} 人</span>
-                      ) : null;
-                    })()}
+                    {activeSessionData && activeSessionData.agent_ids.length > 1 && (
+                      <button
+                        onClick={() => setShowMembers(!showMembers)}
+                        className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded hover:bg-purple-200 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        群聊 · {activeSessionData.agent_ids.length} 人
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -369,8 +411,72 @@ function AppContent() {
                   </div>
                 </div>
               )}
+
+              {/* Group Members Panel */}
+              {showMembers && activeSessionData && activeSessionData.agent_ids.length > 1 && (
+                <div className="absolute top-10 right-4 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-700">群成员 ({activeSessionData.agent_ids.length})</h3>
+                    <button onClick={() => setShowMembers(false)} className="text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+
+                  {/* Current members */}
+                  <div className="max-h-48 overflow-y-auto">
+                    {activeSessionData.agent_ids.map((aid) => {
+                      const ag = agents.find((a) => a.agent_id === aid);
+                      return (
+                        <div key={aid} className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                              {(ag?.name || '?').slice(0, 1)}
+                            </div>
+                            <span className="text-sm text-gray-700">{ag?.name || aid.slice(0, 8)}</span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveMember(activeSession, aid)}
+                            className="text-xs text-gray-400 hover:text-red-500 p-1"
+                            title="移出群聊"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Add members */}
+                  {agents.filter((a) => !activeSessionData.agent_ids.includes(a.agent_id)).length > 0 && (
+                    <div className="border-t">
+                      <div className="px-4 py-2">
+                        <p className="text-xs text-gray-500 font-medium mb-1">添加成员</p>
+                        {agents
+                          .filter((a) => !activeSessionData.agent_ids.includes(a.agent_id))
+                          .map((ag) => (
+                            <div key={ag.agent_id} className="flex items-center justify-between py-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white text-[10px] font-bold">
+                                  {ag.name.slice(0, 1)}
+                                </div>
+                                <span className="text-xs text-gray-600">{ag.name}</span>
+                              </div>
+                              <button
+                                onClick={() => handleAddMember(activeSession, ag.agent_id)}
+                                className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+                              >
+                                + 邀请
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <MessagePanel messages={messages} />
-              <ChatInput onSend={handleSend} disabled={!activeSession} agents={agents.map((a) => ({ agent_id: a.agent_id, name: a.name }))} />
+              <ChatInput onSend={handleSend} disabled={!activeSession} agents={sessionAgents.map((a) => ({ agent_id: a.agent_id, name: a.name }))} />
             </div>
           </div>
         )}

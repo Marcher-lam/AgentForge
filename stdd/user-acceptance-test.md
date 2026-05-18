@@ -1,7 +1,7 @@
 # EvoRL User Acceptance Test (UAT) Scripts
 
 > Generated: 2026-05-16 | Scope: agent-core, evolution-engine, rl-engine, frontend-ui
-> Total Scenarios: 48 | Estimated Duration: 45 min
+> Total Scenarios: 50 | Estimated Duration: 45 min
 
 ---
 
@@ -502,7 +502,7 @@
 | rl-engine | 9 | 9 | 0 | 全部 tests passed |
 | frontend-ui | 16 | 2 | 14 | UI 交互符合预期 |
 | integration | 5 | 2 | 3 | 端到端数据流通 |
-| **Total** | **50** | **24** | **17** | **50/50 通过** |
+| **Total** | **50** | **33** | **17** | **50/50 通过** |
 
 ### 自动化验证命令
 

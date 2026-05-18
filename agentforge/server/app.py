@@ -1291,6 +1291,50 @@ def create_app() -> FastAPI:
         state.messages[session_id] = [m for m in msgs if m["message_id"] != message_id]
         return {"status": "ok", "deleted": message_id}
 
+    # ── Session Members (Group Chat) ─────────────────────
+    @app.get("/api/sessions/{session_id}/members")
+    async def get_session_members(session_id: str) -> dict:
+        session = next((s for s in state.sessions if s["session_id"] == session_id), None)
+        if not session:
+            return {"error": "session not found"}
+        members = []
+        for aid in session.get("agent_ids", []):
+            ag = state.agents.get(aid)
+            if ag:
+                members.append({"agent_id": aid, "name": ag.name, "status": "ONLINE"})
+        return {"session_id": session_id, "members": members}
+
+    @app.post("/api/sessions/{session_id}/members")
+    async def add_session_member(session_id: str, body: dict) -> dict:
+        session = next((s for s in state.sessions if s["session_id"] == session_id), None)
+        if not session:
+            return {"error": "session not found"}
+        agent_id = body.get("agent_id")
+        if not agent_id:
+            return {"error": "agent_id is required"}
+        if agent_id not in state.agents:
+            return {"error": "agent not found"}
+        if agent_id in session["agent_ids"]:
+            return {"error": "agent already in session"}
+        session["agent_ids"].append(agent_id)
+        session["updated_at"] = _now()
+        if len(session["agent_ids"]) > 1:
+            session["type"] = "GROUP_BROADCAST"
+        return {"status": "ok", "agent_ids": session["agent_ids"]}
+
+    @app.delete("/api/sessions/{session_id}/members/{agent_id}")
+    async def remove_session_member(session_id: str, agent_id: str) -> dict:
+        session = next((s for s in state.sessions if s["session_id"] == session_id), None)
+        if not session:
+            return {"error": "session not found"}
+        if agent_id not in session["agent_ids"]:
+            return {"error": "agent not in session"}
+        session["agent_ids"].remove(agent_id)
+        session["updated_at"] = _now()
+        if len(session["agent_ids"]) <= 1:
+            session["type"] = "ONE_VS_ONE"
+        return {"status": "ok", "agent_ids": session["agent_ids"]}
+
     @app.get("/api/sessions/{session_id}/export")
     async def export_session(session_id: str) -> dict:
         session = next((s for s in state.sessions if s["session_id"] == session_id), None)

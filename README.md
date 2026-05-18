@@ -90,7 +90,7 @@ AgentForge/
 │   │   ├── main.py                # Uvicorn 启动入口
 │   │   └── run.py                 # CLI REPL 入口
 │   ├── types/
-│   │   ├── config.py              # AgentConfig / LLMOverride / Evolution / RL / MCP 配置
+│   │   ├── config.py              # AgentConfig / LLMOverride / EvolutionConfig / RLConfig / MCPServerConfig
 │   │   ├── errors.py              # 异常类型层级
 │   │   └── message.py             # 消息类型定义
 │   └── infra/
@@ -103,7 +103,8 @@ AgentForge/
 ├── frontend/                      # React 前端
 │   └── src/
 │       ├── App.tsx                # 主应用（WebSocket + REST 轮询）
-│       ├── atoms.ts               # Jotai 状态 atoms
+│       ├── atoms/
+│       │   └── index.ts            # Jotai 状态 atoms
 │       ├── components/
 │       │   ├── chat/              # 对话面板 + 输入框 + 群聊/删除/导出
 │       │   ├── grid/              # 智能体卡片管理（创建时一步配齐 LLM/技能/MCP/进化/RL）
@@ -165,7 +166,7 @@ LLM 回复时体现人格特质                   LLM 回复时使用优化后�
 3. **Phase 3 — 旁观者评论**：不相关 Agent 只有在确实有独特跨界视角时才简短发言，否则 PASS（max_tokens=64 强制简短）
 
 **@提及机制**：
-- **用户 @提及**：输入框输入 `@` 弹出 Agent 列表选择，被 @ 的 Agent 跳过相关性检查直接回复
+- **用户 @提及**：输入框输入 `@` 弹出**当前会话成员**列表选择（仅展示同群 Agent），被 @ 的 Agent 跳过相关性检查直接回复
 - **Agent 互 @**：Agent 回复中包含 `@其他Agent名` 时，被 @ 的 Agent 自动参与讨论，模拟真人团队协作
 - **链式触发**：最多 3 层 @链，防止无限循环，已发言 Agent 不重复触发
 
@@ -195,7 +196,7 @@ AgentConfig:
   ├── tool_ids: [...]         # 从全局工具池选择的工具
   ├── skill_ids: [...]        # 从全局技能池选择的技能
   ├── mcp_server_ids: [...]   # 关联的 MCP 服务器
-  ├── evolution: EvoConfig    # 独立的进化参数
+  ├── evolution: EvolutionConfig    # 独立的进化参数
   └── rl: RLConfig            # 独立的 RL 训练参数
 ```
 
@@ -423,6 +424,9 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | DELETE | `/api/sessions/{id}` | 删除会话及其消息 |
 | DELETE | `/api/sessions/{id}/messages/{mid}` | 删除单条消息 |
 | GET | `/api/sessions/{id}/export` | 导出聊天记录（JSON，含会话/消息/Agent 信息） |
+| GET | `/api/sessions/{id}/members` | 获取群成员列表 |
+| POST | `/api/sessions/{id}/members` | 添加群成员（body: `{agent_id}`） |
+| DELETE | `/api/sessions/{id}/members/{agent_id}` | 移除群成员 |
 | GET/PUT | `/api/settings` | 读写全局 LLM 配置 |
 | WS | `/ws` | WebSocket 实时通信 |
 
@@ -454,7 +458,7 @@ cd frontend && npx tsc --noEmit
 
 | Tab | 功能 |
 |-----|------|
-| 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格 |
+| 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格。@提及仅展示当前会话成员。群聊支持成员管理：查看成员列表、邀请新成员、移出成员（类微信群交互） |
 | 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持上传 JSON 知识文件到该 Agent 的 Milvus 专属知识库，点击跳转对话 |
 | 监控 | 消息流监控面板（统计条/类型筛选/自动滚动切换） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |

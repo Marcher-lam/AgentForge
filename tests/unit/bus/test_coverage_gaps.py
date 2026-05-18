@@ -237,8 +237,8 @@ class TestWebSocketCoverageGaps:
         port = bus._server.sockets[0].getsockname()[1]
 
         async with websockets.connect(f"ws://127.0.0.1:{port}", proxy=None) as client:
-            # Subscribe frame has no 'message' key — previously crashed with KeyError
-            await client.send(json.dumps({"subscribe": True, "topic": "safe.sub"}))
+            # Subscribe frame must use {"type": "subscribe", "topic": "..."} format
+            await client.send(json.dumps({"type": "subscribe", "topic": "safe.sub"}))
             await asyncio.sleep(0.2)
 
             # Verify subscription registered on server side

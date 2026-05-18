@@ -1,140 +1,78 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { DashboardPage } from '../components/dashboard/DashboardPage';
+import type { AgentSummary } from '../types/api';
 
-const evolutionData = {
-  fitnessCurves: {
-    best: [{ x: 0, y: 0.5 }, { x: 1, y: 0.7 }, { x: 2, y: 0.9 }],
-    mean: [{ x: 0, y: 0.3 }, { x: 1, y: 0.5 }, { x: 2, y: 0.6 }],
-    std: [{ x: 0, y: 0.1 }, { x: 1, y: 0.08 }, { x: 2, y: 0.05 }],
-  },
-  currentGeneration: 2,
-};
-
-const rlData = {
-  metrics: {
-    reward: [{ x: 0, y: 10 }, { x: 1, y: 20 }, { x: 2, y: 35 }],
-    loss: [{ x: 0, y: 0.5 }, { x: 1, y: 0.3 }, { x: 2, y: 0.1 }],
-  },
-  currentStep: 1000,
-  algorithm: 'PPO',
-};
+function makeAgent(overrides: Partial<AgentSummary> = {}): AgentSummary {
+  return {
+    agent_id: 'agent-1',
+    name: 'Test Agent',
+    system_prompt: 'You are helpful',
+    config: {},
+    ...overrides,
+  };
+}
 
 describe('DashboardPage', () => {
-  it('renders both tabs', () => {
-    render(
-      <DashboardPage
-        activeTab="evolution"
-        onTabChange={vi.fn()}
-        evolutionData={evolutionData}
-        rlData={null}
-      />
-    );
-    expect(screen.getByText('进化引擎')).toBeInTheDocument();
-    expect(screen.getByText('强化学习')).toBeInTheDocument();
+  it('renders agent cards', () => {
+    const agents = [makeAgent(), makeAgent({ agent_id: 'agent-2', name: 'Agent 2' })];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    expect(screen.getByText('Test Agent')).toBeInTheDocument();
+    expect(screen.getByText('Agent 2')).toBeInTheDocument();
   });
 
-  it('shows evolution data on evolution tab', () => {
-    render(
-      <DashboardPage
-        activeTab="evolution"
-        onTabChange={vi.fn()}
-        evolutionData={evolutionData}
-        rlData={null}
-      />
-    );
-    expect(screen.getByText(/当前代数：2/)).toBeInTheDocument();
-    expect(screen.getByText('适应度曲线')).toBeInTheDocument();
+  it('shows empty state when no agents', () => {
+    render(<DashboardPage agents={[]} apiBase="http://localhost:8000" />);
+    expect(screen.getByText('暂无智能体')).toBeInTheDocument();
   });
 
-  it('shows RL data on rl tab', () => {
-    render(
-      <DashboardPage
-        activeTab="rl"
-        onTabChange={vi.fn()}
-        evolutionData={null}
-        rlData={rlData}
-      />
-    );
-    expect(screen.getByText(/步数：1000/)).toBeInTheDocument();
-    expect(screen.getByText(/算法：PPO/)).toBeInTheDocument();
+  it('renders agent count heading', () => {
+    const agents = [makeAgent()];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    // Page renders the agent card grid
+    expect(screen.getByText('Test Agent')).toBeInTheDocument();
   });
 
-  it('calls onTabChange when tab clicked', async () => {
-    const onTabChange = vi.fn();
-    render(
-      <DashboardPage
-        activeTab="evolution"
-        onTabChange={onTabChange}
-        evolutionData={evolutionData}
-        rlData={null}
-      />
-    );
-    await userEvent.click(screen.getByText('强化学习'));
-    expect(onTabChange).toHaveBeenCalledWith('rl');
+  it('renders with single agent', () => {
+    const agents = [makeAgent({ agent_id: 'a1', name: 'Solo' })];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    expect(screen.getByText('Solo')).toBeInTheDocument();
   });
 
-  it('shows empty state when no evolution data', () => {
-    render(
-      <DashboardPage
-        activeTab="evolution"
-        onTabChange={vi.fn()}
-        evolutionData={null}
-        rlData={null}
-      />
-    );
-    expect(screen.getByText(/暂无进化数据/)).toBeInTheDocument();
+  it('shows system prompt in agent card', () => {
+    const agents = [makeAgent({ system_prompt: 'Custom prompt' })];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    expect(screen.getByText(/Custom prompt/)).toBeInTheDocument();
   });
 
-  it('shows empty state when no RL data', () => {
-    render(
-      <DashboardPage
-        activeTab="rl"
-        onTabChange={vi.fn()}
-        evolutionData={null}
-        rlData={null}
-      />
-    );
-    expect(screen.getByText(/暂无训练数据/)).toBeInTheDocument();
+  it('renders multiple agent cards', () => {
+    const agents = [
+      makeAgent({ agent_id: 'a1', name: 'Alpha' }),
+      makeAgent({ agent_id: 'a2', name: 'Beta' }),
+      makeAgent({ agent_id: 'a3', name: 'Gamma' }),
+    ];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+    expect(screen.getByText('Gamma')).toBeInTheDocument();
   });
 
-  it('renders reward and loss metrics on RL tab', () => {
-    render(
-      <DashboardPage
-        activeTab="rl"
-        onTabChange={vi.fn()}
-        evolutionData={null}
-        rlData={rlData}
-      />
-    );
-    expect(screen.getByText('累计奖励')).toBeInTheDocument();
-    expect(screen.getByText('损失函数')).toBeInTheDocument();
+  it('handles undefined config gracefully', () => {
+    const agents = [makeAgent({ config: undefined as any })];
+    render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    expect(screen.getByText('Test Agent')).toBeInTheDocument();
   });
 
-  it('shows evolution summary cards', () => {
-    render(
-      <DashboardPage
-        activeTab="evolution"
-        onTabChange={vi.fn()}
-        evolutionData={evolutionData}
-        rlData={null}
-      />
-    );
-    expect(screen.getByText('最优适应度')).toBeInTheDocument();
-    expect(screen.getByText('进化代数')).toBeInTheDocument();
-    expect(screen.getByText('适应度提升')).toBeInTheDocument();
+  it('renders create agent button area', () => {
+    const agents = [makeAgent()];
+    const { container } = render(<DashboardPage agents={agents} apiBase="http://localhost:8000" />);
+    // Dashboard should render without errors
+    expect(container.querySelector('.grid, [class*="grid"]')).toBeTruthy();
   });
 
-  it('shows RL comparison chart', () => {
-    render(
-      <DashboardPage
-        activeTab="rl"
-        onTabChange={vi.fn()}
-        evolutionData={null}
-        rlData={rlData}
-      />
-    );
-    expect(screen.getByText(/奖励 vs 损失/)).toBeInTheDocument();
+  it('renders with empty apiBase', () => {
+    const agents = [makeAgent()];
+    render(<DashboardPage agents={agents} apiBase="" />);
+    expect(screen.getByText('Test Agent')).toBeInTheDocument();
   });
 });

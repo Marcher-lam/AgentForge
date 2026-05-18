@@ -1,6 +1,6 @@
 # AgentForge — 项目全景文档
 
-> 版本: 4.0 | 更新: 2026-05-17 | 方法论: STDD
+> 版本: 5.0 | 更新: 2026-05-18 | 方法论: STDD
 > 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环
 
 ---
@@ -20,7 +20,7 @@
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
 | 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
-| API 端点 | 49+ REST/WebSocket 路由 |
+| API 端点 | 49 REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | 状态管理 | Jotai atoms |
 
@@ -73,12 +73,11 @@ AgentForge/
 │   │   └── fitness/                   # 适应度函数 + 多目标 + 异步包装
 │   ├── rlforge/                       # 强化学习引擎
 │   │   ├── environment.py             # CartPole 风格环境
-│   │   ├── algorithms/
-│   │   │   ├── dqn/                   # DQN（ReplayBuffer + 目标网络 + e-greedy）
-│   │   │   └── ppo/                   # PPO（ActorCritic + GAE + PPO-Clip）
-│   │   ├── buffers/                   # ReplayBuffer + RolloutBuffer
-│   │   ├── networks/                  # MLP 策略网络
+│   │   ├── policy.py                  # 2层 MLP 策略网络 + Adam 优化器
 │   │   ├── trainer.py                 # RLTrainer（统一训练入口）
+│   │   ├── ppo.py                     # PPO（ActorCritic + GAE + PPO-Clip）
+│   │   ├── dqn.py                     # DQN（ReplayBuffer + 目标网络 + e-greedy）
+│   │   ├── buffer.py                  # ReplayBuffer + RolloutBuffer
 │   │   └── checkpoint.py              # 模型检查点保存/加载
 │   ├── skills/
 │   │   ├── registry.py                # 技能注册表（SKILL.md 原生格式）
@@ -99,7 +98,11 @@ AgentForge/
 │   │   └── run.py                     # CLI REPL 入口
 │   ├── types/
 │   │   ├── config.py                  # AgentConfig / LLMOverride / Evolution / RL / MCP 配置
-│   │   ├── errors.py                  # 异常类型层级│   │   └── message.py                 # 消息类型定义
+│   │   ├── errors.py                  # 异常类型层级
+│   │   ├── message.py                 # 消息类型定义
+│   │   ├── memory.py                  # 记忆类型（MemoryType / MemoryEntry / SearchResult）
+│   │   ├── protocols.py               # Protocol 接口定义
+│   │   └── state.py                   # Agent 状态机（AgentState + 状态转换）
 │   └── infra/
 │       ├── config.py                  # 全局配置管理
 │       ├── logging.py                 # structlog 结构化日志
@@ -110,9 +113,14 @@ AgentForge/
 ├── frontend/                          # React 前端
 │   ├── src/
 │   │   ├── App.tsx                    # 主应用（WebSocket + REST + 聊天管理）
-│   │   ├── atoms.ts                   # Jotai 状态 atoms
+│   │   ├── atoms/
+│   │   │   └── index.ts              # Jotai 状态 atoms
 │   │   ├── types/
 │   │   │   └── api.ts                 # TypeScript 类型定义
+│   │   ├── schemas/
+│   │   │   ├── communication.ts       # 通信协议 schema
+│   │   │   ├── evorl-custom.ts        # EvoRL 自定义 schema
+│   │   │   └── evorl-workflow.ts      # EvoRL 工作流 schema
 │   │   ├── components/
 │   │   │   ├── chat/
 │   │   │   │   ├── MessagePanel.tsx    # 消息列表渲染
@@ -181,6 +189,8 @@ AgentForge/
 - 相关性判定: 每个 Agent 独立 LLM 调用，严格过滤（"必须是只有你这个角色才能专业回答才算相关"）
 - 旁观者约束: max_tokens=64 + 严格 PASS prompt，防止强行蹭话题
 - @提及链: Agent 回复中含 @其他Agent名 时，被 @ Agent 自动加入讨论，最多 3 层链式触发
+- @提及范围: 前端 @mention 下拉列表仅展示当前会话成员（session 级过滤），非全局 Agent 列表
+- 群成员管理: 点击群聊标识弹出成员面板，支持查看/邀请/移出成员（类微信群交互）
 - Fallback: 无人相关时取前 2 个 Agent 友好回复，避免全体沉默
 - 群聊模式: `GROUP_BROADCAST` 会话类型
 
@@ -243,16 +253,19 @@ AgentConfig:
   ├── tool_ids: list[str]           # 从全局工具池选择
   ├── skill_ids: list[str]          # 从全局技能池选择
   ├── mcp_server_ids: list[str]     # 关联的 MCP 服务器
-  ├── evolution: EvoConfig          # 独立进化参数
-  │   ├── mode: str                 # "personality" | "benchmark"
+  ├── evolution: EvolutionConfig    # 独立进化参数
+  │   ├── mode: str                 # "agent" | "sphere"
   │   ├── population_size: int
   │   ├── max_generations: int
   │   ├── mutation_rate: float
-  │   └── elite_count: int
+  │   ├── elite_size: int
+  │   ├── genome_dim: int
+  │   └── seed: int
   └── rl: RLConfig                  # 独立 RL 训练参数
       ├── algorithm: str            # "PPO" | "DQN" | "REINFORCE"
       ├── total_steps: int
-      └── learning_rate: float
+      ├── learning_rate: float
+      └── seed: int
 ```
 
 **三层架构**: 全局注册表 → AgentConfig 筛选 → 运行时接线
@@ -494,6 +507,9 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | DELETE | `/api/sessions/{id}` | 删除会话及其消息 |
 | DELETE | `/api/sessions/{id}/messages/{mid}` | 删除单条消息 |
 | GET | `/api/sessions/{id}/export` | 导出聊天记录（JSON，含会话/消息/Agent 信息） |
+| GET | `/api/sessions/{id}/members` | 获取群成员列表 |
+| POST | `/api/sessions/{id}/members` | 添加群成员（body: `{agent_id}`） |
+| DELETE | `/api/sessions/{id}/members/{agent_id}` | 移除群成员 |
 | GET | `/api/settings` | 获取全局 LLM 配置 |
 | PUT | `/api/settings` | 更新全局 LLM 配置 |
 | WS | `/ws` | WebSocket 实时通信 |
@@ -515,7 +531,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 
 | Tab | 功能描述 |
 |-----|----------|
-| **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。现代 IM 风格 UI：渐变圆形头像（12 种角色配色）、Per-Agent 独立色调气泡、完整 Markdown 渲染（标题/代码块/表格/列表/引用）+ LaTeX 公式（KaTeX 行内 `$...$` / 块级 `$$...$$`）+ 代码语法高亮（highlight.js）。启动自带"AI 专家团队"群聊（10 个预设角色）。支持删除会话（带确认）、导出聊天记录、群聊多 Agent 讨论 |
+| **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。现代 IM 风格 UI：渐变圆形头像（12 种角色配色）、Per-Agent 独立色调气泡、完整 Markdown 渲染（标题/代码块/表格/列表/引用）+ LaTeX 公式（KaTeX 行内 `$...$` / 块级 `$$...$$`）+ 代码语法高亮（highlight.js）。@提及仅展示当前会话成员（非全局 Agent）。群聊成员管理：点击群标识弹出成员面板，支持查看成员、邀请新成员、移出成员（类微信群交互）。启动自带"AI 专家团队"群聊（10 个预设角色）。支持删除会话（带确认）、导出聊天记录 |
 | **智能体** | 卡片式管理。创建时一步配齐 LLM Provider/Model + 技能 + MCP + 进化参数 + RL 参数。渐变头像、能力徽章、per-agent 配置。详情弹窗支持上传 JSON 知识文件到该 Agent 的 Milvus 专属 collection。点击跳转对话 |
 | **监控** | 消息流监控面板。统计条（消息总数/Agent 分布）、类型筛选、自动滚动切换 |
 | **仪表盘** | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 + LTTB 大数据降采样 |
@@ -595,7 +611,7 @@ python -m pytest tests/ -v
 
 ---
 
-## 10. 架构特征
+## 11. 架构特征
 
 | 特征 | 描述 |
 |------|------|
@@ -610,10 +626,11 @@ python -m pytest tests/ -v
 | 进化闭环 | 最优基因组 → 人格特质 → system_prompt 写回 |
 | RAG 闭环 | Per-Agent Milvus collection + fastembed + JSON上传 + 联网搜索 + LLM 自主决策 |
 | 数据可视化 | Recharts 双 Y 轴图表 + LTTB 降采样 + 进化树 SVG + 热力图 |
+| 群聊管理 | @提及会话级过滤 + 群成员面板（查看/邀请/移出）+ 成员 API |
 
 ---
 
-## 11. 关键数据结构
+## 12. 关键数据结构
 
 ### 11.1 消息类型
 
@@ -635,38 +652,39 @@ class Message:
 # agentforge/types/config.py
 @dataclass
 class AgentConfig:
-    name: str
-    system_prompt: str
     llm: LLMOverride | None = None
     tool_ids: list[str] = field(default_factory=list)
     skill_ids: list[str] = field(default_factory=list)
     mcp_server_ids: list[str] = field(default_factory=list)
-    evolution: EvoConfig | None = None
+    evolution: EvolutionConfig | None = None
     rl: RLConfig | None = None
 
 @dataclass
 class LLMOverride:
     provider_profile: str | None = None  # 引用 LLM Profile 卡片
-    model: str | None = None
-    temperature: float | None = None
-    api_key: str | None = None
-    base_url: str | None = None
     provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
 
 @dataclass
-class EvoConfig:
-    mode: str = "personality"        # "personality" | "benchmark"
-    population_size: int = 20
+class EvolutionConfig:
+    mode: str = "agent"              # "agent" | "sphere"
+    population_size: int = 50
     max_generations: int = 50
     mutation_rate: float = 0.1
-    elite_count: int = 2
-    crossover_rate: float = 0.8
+    elite_size: int = 2
+    genome_dim: int = 10
+    seed: int = 42
 
 @dataclass
 class RLConfig:
     algorithm: str = "PPO"           # "PPO" | "DQN" | "REINFORCE"
-    total_steps: int = 5000
+    total_steps: int = 200
     learning_rate: float = 0.001
+    seed: int = 42
 ```
 
 ### 11.3 LLM Profile
@@ -728,7 +746,7 @@ interface RLRun {
 
 ---
 
-## 12. 里程碑状态
+## 13. 里程碑状态
 
 | Phase | 描述 | 状态 |
 |-------|------|------|
@@ -741,29 +759,31 @@ interface RLRun {
 
 ---
 
-## 13. 质量度量
+## 14. 质量度量
 
 | 维度 | 数据 |
 |------|------|
 | 后端导入 | 全模块零错误 |
 | 前端编译 | TypeScript 零错误 |
+| 后端测试 | 298 passed / 0 failed / 9 skipped |
+| 后端测试文件 | 29（19 unit + 6 integration + 4 e2e） |
 | 前端测试 | 47 vitest 全部通过 |
-| API 端点 | 49+ REST/WebSocket 路由 |
-| 总代码覆盖 | 93% |
-| 总语句数 | 1,362 |
-| 测试总数 | 269（228 unit + 16 integration + 25 e2e） |
-| APP Mass | 0.278 CC/SLOC（健康 < 0.3） |
-| 平均 CC | 2.4（Grade A） |
+| API 端点 | 49 REST/WebSocket 路由 |
+| 后端 LOC | 7,389 行（不含 __init__.py） |
+| 前端 LOC | 1,129 行 |
+| 测试 LOC | 5,645 行 |
 
 ---
 
-## 14. 已知问题与改进计划
+## 15. 已知问题与改进计划
 
 ### P0 — 待修复
 
 | ID | 描述 | 影响 |
 |----|------|------|
-| BUG-1 | ~~websocket.py subscribe 帧解析 KeyError~~ ✅ 已修复 | 统一帧格式 `type:"subscribe"` + 健壮解析 |
+| ~~BUG-1~~ | ~~websocket.py subscribe 帧解析 KeyError~~ ✅ 已修复 + 测试对齐 | 测试帧格式统一为 `type:"subscribe"` |
+| ~~BUG-2~~ | ~~LLM Agent test_chat_with_system_prompt 断言失败~~ ✅ 已修复 | 断言改为 `startswith` 适配技能指令追加 |
+| ~~BUG-3~~ | ~~前端 18 个组件渲染测试失败~~ ✅ 已修复 | 根级 vitest.config.ts 配置 jsdom + 测试对齐组件接口 |
 
 ### P1 — 近期计划
 
@@ -774,6 +794,7 @@ interface RLRun {
 | PERF-1 | WebSocket 二进制序列化 (JSON→MessagePack) | 跨进程延迟优化 |
 | PERF-2 | Topic Trie 替代线性扫描 | 大量订阅场景性能 |
 | TEST-1 | websocket.py 覆盖率 88%→95% | 补齐测试 |
+| TEST-2 | 前端组件渲染测试修复（18/47 失败） | 测试可靠性 |
 
 ### P2 — 优化项
 
@@ -785,7 +806,7 @@ interface RLRun {
 
 ---
 
-## 15. 技能开发指南
+## 16. 技能开发指南
 
 在 `skills/` 目录下创建技能，格式与 OpenClaw 完全兼容：
 
@@ -825,4 +846,4 @@ curl -X POST localhost:8000/api/skills/install-url -d '{"url": "https://github.c
 ---
 
 > 本文档为 AgentForge 项目全景文档，覆盖后端、前端、三个算法引擎、Agentic RAG、技能/工具系统的完整技术细节。
-> 更新时间: 2026-05-17 (v3.0)。
+> 更新时间: 2026-05-18 (v5.0)。

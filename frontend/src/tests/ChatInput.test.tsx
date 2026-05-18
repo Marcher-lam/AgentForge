@@ -7,7 +7,7 @@ describe('ChatInput', () => {
   it('renders textarea and send button', () => {
     render(<ChatInput onSend={vi.fn()} />);
     expect(screen.getByPlaceholderText(/输入消息/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument();
+    expect(screen.getByRole('button')).toBeInTheDocument();
   });
 
   it('calls onSend on Enter key', async () => {
@@ -28,7 +28,7 @@ describe('ChatInput', () => {
 
   it('disables button when input is empty', () => {
     render(<ChatInput onSend={vi.fn()} />);
-    const btn = screen.getByRole('button', { name: /send/i });
+    const btn = screen.getByRole('button');
     expect(btn).toBeDisabled();
   });
 

@@ -16,14 +16,11 @@
 | 进化引擎 | 遗传算法（锦标赛/SBX/高斯变异 + 人格优化） |
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
-| API 端点 | 45 个 REST/WebSocket 路由 |
+| API 端点 | 49 个 REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | Per-Agent 配置 | LLM/工具/技能/MCP/进化/RL 独立配置 + 多 Provider LLM Profile |
 | 仪表盘 | Agent 卡片网格 + 训练记录左右分栏（日志+图表）+ 图表放大 |
 | 聊天管理 | 删除对话记录 + 群聊（多 Agent 多轮讨论）+ 导出聊天记录（JSON） |
-| 前端测试 | 47 vitest 全部通过 |
-| Per-Agent 配置 | LLM/工具/技能/MCP/进化/RL 独立配置 + 多 Provider LLM Profile |
-| 仪表盘 | Agent 卡片网格 + 训练记录左右分栏（日志+图表）+ 图表放大 |
 
 ---
 
@@ -155,7 +152,7 @@
 | Types: api.ts | 1 ts | — |
 | Schemas: Zod validation | 3 ts | — |
 | Utils: LTTB downsampling | 1 ts | 1 unit |
-| **合计** | **24 files** | **41 vitest + 14 Playwright** |
+| **合计** | **24 files** | **47 vitest** |
 
 ---
 
@@ -274,7 +271,7 @@
 |------|------|------|
 | A2: TDD Blocking | 所有代码有测试覆盖 | ✅ 93% 总覆盖率 |
 | A7: Security Blocking | 无硬编码密钥，输入校验 | ✅ 无 TODO/FIXME/HACK |
-| A9: CI/CD Blocking | PR 通过全量测试 | ✅ 228 passed, 0 failed |
+| A9: CI/CD Blocking | PR 通过全量测试 | ✅ 298 passed, 0 failed, 9 skipped |
 | Waiver | rlforge mutation 74.4% | ⚠️ 豁免至 2026-05-22 |
 
 ---

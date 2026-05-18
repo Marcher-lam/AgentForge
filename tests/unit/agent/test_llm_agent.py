@@ -45,7 +45,7 @@ class TestLLMAgentUnit:
         await agent.chat("Hi")
         call_args = mock_llm.complete.call_args[0][0]
         assert call_args.messages[0].role == "system"
-        assert call_args.messages[0].content == "Be helpful"
+        assert call_args.messages[0].content.startswith("Be helpful")
 
     @pytest.mark.asyncio
     async def test_chat_with_tool_call(self):

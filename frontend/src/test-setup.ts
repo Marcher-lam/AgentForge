@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom'
 
+// JSDOM doesn't implement scrollIntoView
+Element.prototype.scrollIntoView = function () {};
+
 class MockIntersectionObserver {
   readonly root: Element | null = null;
   readonly rootMargin: string = '';
