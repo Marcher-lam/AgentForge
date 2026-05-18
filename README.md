@@ -317,7 +317,7 @@ Per-session 双轨设计——**共享全量记忆 + Agent 独立标记**：
 3. **生成回复** — 融合记忆+知识库+联网搜索+讨论记录
 
 **技术栈：**
-- Milvus 向量数据库（`MILVUS_URI` 环境变量配置，Docker 地址先留空位，默认 `http://127.0.0.1:19530`）
+- Milvus 向量数据库（默认 Docker 地址 `http://127.0.0.1:19530`，可用 `MILVUS_URI` 环境变量覆盖）
 - Per-Agent collection 隔离：每创建一个 Agent 自动创建一个独立 collection
 - fastembed (BAAI/bge-small-en-v1.5) 384维真实语义 embedding
 - DuckDuckGo 联网搜索（零外部依赖）

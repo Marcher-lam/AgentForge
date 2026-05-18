@@ -215,7 +215,7 @@ AgentForge/
 **实现位置**: `agentforge/server/app.py` → `_agent_reply()` 函数
 
 **技术栈**:
-- **Milvus**: 向量数据库，Per-Agent collection 隔离，`MILVUS_URI` 环境变量配置（默认 `http://127.0.0.1:19530`）
+- **Milvus**: 向量数据库，Per-Agent collection 隔离，默认 Docker 地址 `http://127.0.0.1:19530`，可用 `MILVUS_URI` 覆盖
 - **fastembed**: BAAI/bge-small-en-v1.5, 384维 ONNX 语义 embedding（无需 PyTorch）
 - **DuckDuckGo**: HTML 搜索，urllib 实现，零外部依赖
 
@@ -531,7 +531,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | `LLM_MODEL` | — | 模型名称 |
 | `LLM_API_KEY` | — | API 密钥 |
 | `LLM_BASE_URL` | — | 自定义 API 地址 |
-| `MILVUS_URI` | `http://127.0.0.1:19530` | Milvus 服务地址（Docker 地址先留空位，可用环境变量覆盖） |
+| `MILVUS_URI` | `http://127.0.0.1:19530` | Milvus Docker standalone 服务地址（可用环境变量覆盖） |
 | `LLM_SYSTEM_PROMPT` | `You are a helpful AI assistant.` | 默认智能体提示词 |
 
 ---

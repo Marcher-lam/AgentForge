@@ -38,8 +38,8 @@ class MilvusKnowledgeBase:
 
     def __init__(self, uri: str | None = None, dim: int = 384) -> None:
         # Keep URI configurable. User can set MILVUS_URI to Docker endpoint, e.g. http://127.0.0.1:19530.
-        # Empty means Milvus is not configured yet; the app can still start.
-        self.uri = uri if uri is not None else os.environ.get("MILVUS_URI", "")
+        # Default points to the local Docker Milvus standalone port mapping: 0.0.0.0:19530->19530.
+        self.uri = uri if uri is not None else os.environ.get("MILVUS_URI", "http://127.0.0.1:19530")
         self.dim = dim
         self._client: MilvusClient | None = None
         self._model = TextEmbedding("BAAI/bge-small-en-v1.5")
@@ -161,12 +161,15 @@ class MilvusKnowledgeBase:
                 "tags": meta.get("tags", []),
             })
 
-        self.client.upsert(collection_name=name, data=rows)
+        self.client.insert(collection_name=name, data=rows)
+        self.client.flush(collection_name=name)
+        self.client.load_collection(collection_name=name)
         return len(rows)
 
     def search(self, agent_id: str, query: str, top_k: int = 5) -> list[dict]:
         try:
             name = self.ensure_collection(agent_id)
+            self.client.load_collection(collection_name=name)
             if self.count(agent_id) == 0:
                 return []
             query_emb = self._embed([query])[0]
@@ -198,6 +201,7 @@ class MilvusKnowledgeBase:
     def count(self, agent_id: str) -> int:
         try:
             name = self.ensure_collection(agent_id)
+            self.client.flush(collection_name=name)
             stats = self.client.get_collection_stats(collection_name=name)
             return int(stats.get("row_count", 0))
         except Exception:
