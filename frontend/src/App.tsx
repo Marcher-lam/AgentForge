@@ -32,7 +32,9 @@ function AppContent() {
   const [sessionType, setSessionType] = useState<'single' | 'group'>('single');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showMembers, setShowMembers] = useState(false);
+  const [typingAgents, setTypingAgents] = useState<Map<string, string>>(new Map());
   const wsRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const [sessions, setSessions] = useAtom(sessionsAtom);
   const [activeSession, setActiveSession] = useAtom(activeSessionAtom);
@@ -60,12 +62,68 @@ function AppContent() {
       };
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        if (data.type === 'message') {
+        if (data.type === 'typing') {
+          const { session_id, sender_name } = data.data;
+          setTypingAgents((prev) => {
+            const next = new Map(prev);
+            next.set(sender_name, session_id);
+            return next;
+          });
+        } else if (data.type === 'tool_call') {
+          // Tool execution notification — show as system message
+          const { session_id, sender_name, tool_name, result } = data.data;
+          setTypingAgents((prev) => {
+            const next = new Map(prev);
+            next.set(`${sender_name}`, session_id);
+            return next;
+          });
+        } else if (data.type === 'chunk') {
+          // Streaming chunk: append to existing message or create placeholder
+          const { message_id, session_id, sender_name, sender_id, chunk } = data.data;
+          setMessageMap((prev) => {
+            const next = new Map(prev);
+            const existing = next.get(session_id) || [];
+            const idx = existing.findIndex((m) => m.message_id === message_id);
+            if (idx === -1) {
+              // First chunk: create placeholder
+              next.set(session_id, [...existing, {
+                message_id,
+                session_id,
+                sender_type: 'AGENT',
+                sender_id,
+                sender_name,
+                content: chunk,
+                content_type: 'TEXT',
+                created_at: new Date().toISOString(),
+              }]);
+            } else {
+              // Append chunk
+              const updated = [...existing];
+              updated[idx] = { ...updated[idx], content: updated[idx].content + chunk };
+              next.set(session_id, updated);
+            }
+            return next;
+          });
+        } else if (data.type === 'message') {
           const msg: FrontendMessage = data.data;
+          // Clear typing indicator for this agent
+          if (msg.sender_type === 'AGENT' && msg.sender_name) {
+            setTypingAgents((prev) => {
+              const next = new Map(prev);
+              next.delete(msg.sender_name);
+              return next;
+            });
+          }
           setMessageMap((prev) => {
             const next = new Map(prev);
             const existing = next.get(msg.session_id) || [];
-            if (!existing.find((m) => m.message_id === msg.message_id)) {
+            // Replace streaming placeholder if exists, otherwise append
+            const streamIdx = existing.findIndex((m) => m.message_id === msg.message_id);
+            if (streamIdx !== -1) {
+              const updated = [...existing];
+              updated[streamIdx] = msg;
+              next.set(msg.session_id, updated);
+            } else if (!existing.find((m) => m.message_id === msg.message_id)) {
               next.set(msg.session_id, [...existing, msg]);
             }
             return next;
@@ -102,6 +160,11 @@ function AppContent() {
     const interval = setInterval(refreshData, 5000);
     return () => clearInterval(interval);
   }, [refreshData]);
+
+  // Auto-scroll to bottom on new messages or typing
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, typingAgents]);
 
   // Poll messages for active session
   useEffect(() => {
@@ -476,6 +539,18 @@ function AppContent() {
               )}
 
               <MessagePanel messages={messages} />
+              {/* Typing indicator */}
+              {typingAgents.size > 0 && (
+                <div className="px-4 py-2 text-sm text-gray-400 flex items-center gap-2">
+                  <span className="flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </span>
+                  <span>{Array.from(typingAgents.keys()).join(', ')} 正在输入...</span>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
               <ChatInput onSend={handleSend} disabled={!activeSession} agents={sessionAgents.map((a) => ({ agent_id: a.agent_id, name: a.name }))} />
             </div>
           </div>

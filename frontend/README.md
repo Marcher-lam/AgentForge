@@ -13,7 +13,7 @@ npx vite --host 0.0.0.0 --port 5173
 
 | Tab | 组件 | 功能 |
 |-----|------|------|
-| 对话 | `App.tsx` (chat tab) | 会话列表（单聊/群聊切换 + 删除确认 + 导出记录）+ 消息面板 + WebSocket 实时通信 |
+| 对话 | `App.tsx` (chat tab) | 会话列表（单聊/群聊切换 + 删除确认 + 导出记录）+ 消息面板 + WebSocket 实时通信 + 流式 token 输出 + 打字指示器（XXX 正在输入...）+ 自动滚动 |
 | 智能体 | `grid/AgentGrid.tsx` | 卡片式管理 + 创建时一步配齐（LLM/技能/MCP/进化/RL）+ 编辑弹窗 + 下载空模板 + JSON 知识文件上传到 Milvus 专属知识库 |
 | 监控 | `monitor/MonitorPage.tsx` | 消息流监控（统计条/类型筛选/自动滚动） |
 | 仪表盘 | `dashboard/DashboardPage.tsx` | Agent 卡片网格 → 点击弹出训练记录（左右分栏：日志+图表）+ 放大按钮 |
@@ -55,6 +55,16 @@ npx vite --host 0.0.0.0 --port 5173
 - 训练完成后提取策略信号（奖励方差→temperature，loss→max_tokens，算法→风格描述）
 - 自动写回 Agent 的 config.llm 参数 + system_prompt `[RL策略优化]` 标签
 - 前端仪表盘可查看奖励/损失训练曲线
+
+**协同进化（Phase 5）** → RL + 进化协同优化：
+- 两阶段：先 RL 训练提取奖励统计 → 再用 RL 增强的适应度函数运行进化
+- 多目标适应度：60% 人格质量 + 40% RL 对齐
+- Pareto 前沿排名（Top 5 个体），写回 `[协同进化人格优化]` 标签
+
+## 流式输出 & 持久化
+
+**流式输出**：WebSocket 事件序列 → `typing`（Agent正在输入...）→ `chunk`（逐 token）→ `message`（最终完整消息替换占位符）
+**消息持久化**：SQLite write-through 缓存，后端重启自动恢复会话和消息历史
 
 ## 测试
 

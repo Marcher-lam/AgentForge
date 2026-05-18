@@ -1,7 +1,7 @@
 # AgentForge — 项目全景文档
 
-> 版本: 5.0 | 更新: 2026-05-18 | 方法论: STDD
-> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环
+> 版本: 6.0 | 更新: 2026-05-18 | 方法论: STDD
+> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环 + 流式输出 + 消息持久化 + 工具执行 + 协同进化
 
 ---
 
@@ -20,7 +20,11 @@
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
 | 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
-| API 端点 | 50 REST/WebSocket 路由 |
+| API 端点 | 55 REST/WebSocket 路由 |
+| 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
+| 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
+| 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
+| 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
 | 前端测试 | 47 vitest 全部通过 |
 | 状态管理 | Jotai atoms |
 
@@ -586,7 +590,7 @@ cd frontend && npm install && cd ..
 
 # 3. 启动后端（使用本地模型示例）
 LLM_PROVIDER=openai \
-LLM_MODEL='VLM/Qwen3.5-9B-MLX-4bit' \
+LLM_MODEL='VLM/Qwen3.6-35B-A3B-4bit' \
 LLM_API_KEY=EMPTY \
 LLM_BASE_URL='http://127.0.0.1:8888/v1' \
 uvicorn agentforge.server.main:create_and_run --host 0.0.0.0 --port 8000 --factory
@@ -758,7 +762,7 @@ interface RLRun {
 | Phase 2 | 能力层（MCP 工具 + SKILL.md 技能 + 三层记忆 + Per-Agent 配置） | ✅ 完成 |
 | Phase 3 | 算法引擎（PPO/DQN/REINFORCE + 遗传算法 + 人格优化） | ✅ 完成 |
 | Phase 4 | 可视化 & UX（仪表盘 + 监控 + 设置 + 聊天管理 + RAG） | ✅ 完成 |
-| Phase 5 | 协同进化（RL + Evolution 协同 + Pareto 优化） | 📋 待开发 |
+| Phase 5 | 协同进化（RL + Evolution 协同 + Pareto 优化 + 人格写回闭环） | ✅ 完成 |
 | Phase 6 | 生产就绪（分布式训练 + 端到端加密 + CI/CD） | 📋 待开发 |
 
 ---
@@ -772,9 +776,13 @@ interface RLRun {
 | 后端测试 | 298 passed / 0 failed / 9 skipped |
 | 后端测试文件 | 29（19 unit + 6 integration + 4 e2e） |
 | 前端测试 | 47 vitest 全部通过 |
-| API 端点 | 50 REST/WebSocket 路由 |
-| 后端 LOC | 7,389 行（不含 __init__.py） |
-| 前端 LOC | 1,129 行 |
+| API 端点 | 55 REST/WebSocket 路由 |
+| 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
+| 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
+| 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
+| 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
+| 后端 LOC | 8,235 行（不含 __init__.py） |
+| 前端 LOC | 4,656 行 |
 | 测试 LOC | 5,645 行 |
 
 ---

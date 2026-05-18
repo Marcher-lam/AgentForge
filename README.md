@@ -27,7 +27,7 @@ cd frontend && npm install && cd ..
 
 # 3. 启动后端（使用本地模型示例）
 LLM_PROVIDER=openai \
-LLM_MODEL='VLM/Qwen3.5-9B-MLX-4bit' \
+LLM_MODEL='VLM/Qwen3.6-35B-A3B-4bit' \
 LLM_API_KEY=EMPTY \
 LLM_BASE_URL='http://127.0.0.1:8888/v1' \
 uvicorn agentforge.server.main:create_and_run --host 0.0.0.0 --port 8000 --factory
@@ -431,6 +431,7 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | GET | `/api/sessions/{id}/members` | 获取群成员列表 |
 | POST | `/api/sessions/{id}/members` | 添加群成员（body: `{agent_id}`） |
 | DELETE | `/api/sessions/{id}/members/{agent_id}` | 移除群成员 |
+| GET | `/api/messages/search` | 消息搜索（?q=关键词） |
 | GET/PUT | `/api/settings` | 读写全局 LLM 配置 |
 | WS | `/ws` | WebSocket 实时通信 |
 
@@ -444,6 +445,15 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | POST | `/api/rl/start` | 启动 RL 训练 |
 | GET | `/api/rl/{id}` | 查询训练状态（含逐步日志） |
 | POST | `/api/rl/{id}/cancel` | 取消训练 |
+
+### 协同进化（Phase 5）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/coevolution/start` | 启动全局协同进化 |
+| POST | `/api/agents/{id}/coevolution/start` | 启动 per-agent 协同进化 |
+| GET | `/api/coevolution/{id}` | 查询协同进化状态（Pareto 前沿 + 双阶段进度） |
+| POST | `/api/coevolution/{id}/cancel` | 取消协同进化 |
 
 ## 测试
 

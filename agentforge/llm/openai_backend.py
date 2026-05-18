@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Any, AsyncIterator
 
 from agentforge.llm.protocol import (
     LLMBackend,
@@ -56,6 +57,21 @@ class OpenAIBackend:
             ),
             finish_reason=choice.finish_reason or "stop",
         )
+
+    async def stream(self, request: LLMRequest) -> AsyncIterator[str]:
+        messages = self._format_messages(request)
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": request.temperature,
+            "max_tokens": request.max_tokens,
+            "stream": True,
+        }
+        resp = await self._client.chat.completions.create(**kwargs)
+        async for chunk in resp:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
 
     def _format_messages(self, request: LLMRequest) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []

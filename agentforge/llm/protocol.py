@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, AsyncIterator, Protocol, runtime_checkable
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,3 +51,4 @@ class LLMResponse:
 @runtime_checkable
 class LLMBackend(Protocol):
     async def complete(self, request: LLMRequest) -> LLMResponse: ...
+    def stream(self, request: LLMRequest) -> AsyncIterator[str]: ...

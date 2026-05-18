@@ -1,6 +1,6 @@
 # EvoRL User Acceptance Test (UAT) Scripts
 
-> Generated: 2026-05-16 | Scope: agent-core, evolution-engine, rl-engine, frontend-ui
+> Generated: 2026-05-16 | Updated: 2026-05-18 | Scope: agent-core, evolution-engine, rl-engine, frontend-ui, coevolution, streaming, persistence
 > Total Scenarios: 50 | Estimated Duration: 45 min
 
 ---

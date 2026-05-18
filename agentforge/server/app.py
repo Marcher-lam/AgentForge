@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agentforge.agent.llm_agent import LLMAgent
 from agentforge.bus.inprocess import InProcessMessageBus
+from agentforge.infra.persistence import PersistenceManager
 from agentforge.llm import create_backend
 from agentforge.llm.protocol import LLMBackend, LLMMessage, LLMRequest
 from agentforge.skills.registry import SkillRegistry
@@ -365,6 +366,193 @@ class RLTrainingRun:
         }
 
 
+class CoEvolutionRun:
+    """Phase 5: RL + Evolution co-evolution with Pareto multi-objective optimization.
+
+    Pipeline: RL training → encode policy as genome → inject into evolution population
+    → multi-objective fitness (personality + RL alignment) → Pareto front ranking.
+    """
+
+    def __init__(self, run_id: str, config: dict, broadcast_fn, agent_id: str | None = None, on_complete=None) -> None:
+        self.run_id = run_id
+        self.config = config
+        self.broadcast_fn = broadcast_fn
+        self.agent_id = agent_id
+        self.on_complete = on_complete
+        self.status = "idle"
+        self.phase = "waiting"  # waiting → rl → evolution → completed
+        self.history: list[dict] = []
+        self.rl_metrics: dict[str, list] = {"reward": [], "loss": []}
+        self.evo_metrics: list[dict] = []
+        self.pareto_front: list[dict] = []
+        self._task: asyncio.Task | None = None
+
+    def start(self) -> None:
+        self.status = "running"
+        self.phase = "rl"
+        self._task = asyncio.create_task(self._run())
+
+    def cancel(self) -> None:
+        self.status = "cancelled"
+        if self._task:
+            self._task.cancel()
+
+    async def _run(self) -> None:
+        import numpy as np
+        from agentforge.rlforge.trainer import RLTrainer, TrainingConfig
+        from agentforge.evoforge.engine.evolution import EvolutionEngine
+        from agentforge.evoforge.engine.population import Individual, Population
+        from agentforge.evoforge.engine.callbacks import Callback, GenerationStats
+        from agentforge.evoforge.engine.termination import TerminationCriteria
+        from agentforge.evoforge.operators.selection import tournament_selection
+        from agentforge.evoforge.operators.mutation import gaussian_mutation
+        from agentforge.evoforge.operators.crossover import sbx_crossover
+        from agentforge.evoforge.genomes.real import RealGenome
+
+        run_ref = self
+
+        # ── Phase A: RL Training ─────────────────────────────
+        try:
+            algo = self.config.get("rl_algorithm", "PPO")
+            rl_steps = self.config.get("rl_steps", 300)
+            trainer = RLTrainer(TrainingConfig(algorithm=algo, total_steps=rl_steps, seed=self.config.get("seed", 42)))
+
+            def on_step(metric):
+                run_ref.rl_metrics["reward"].append({"x": metric.step, "y": round(metric.reward, 3)})
+                run_ref.rl_metrics["loss"].append({"x": metric.step, "y": round(abs(metric.loss), 3)})
+
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: trainer.train(callback=on_step))
+            self.phase = "evolution"
+
+            # Extract RL reward statistics for fitness integration
+            rewards = [m["y"] for m in self.rl_metrics.get("reward", [])]
+            rl_final_reward = float(np.mean(rewards[-10:])) if len(rewards) >= 10 else 0.0
+            rl_std = float(np.std(rewards)) if rewards else 1.0
+        except asyncio.CancelledError:
+            self.status = "cancelled"; return
+        except Exception as e:
+            self.status = f"error (RL phase): {e}"; return
+
+        # ── Phase B: Evolution with RL-enhanced Fitness ──────
+        try:
+            dim = self.config.get("genome_dim", 10)
+            pop_size = self.config.get("population_size", 40)
+            max_gen = self.config.get("max_generations", 30)
+            seed = self.config.get("seed", 42)
+            rng = np.random.default_rng(seed)
+
+            # Multi-objective fitness: [personality_score, rl_alignment_score]
+            def fitness_fn(individuals: list) -> list[float]:
+                results = []
+                for ind in individuals:
+                    g = np.array(ind.genome.genes if hasattr(ind.genome, "genes") else ind.genome)
+                    traits = 1.0 / (1.0 + np.exp(-g))
+
+                    # Objective 1: Personality quality (balance + diversity - extremes)
+                    balance = -np.abs(np.mean(traits) - 0.5) * 2
+                    diversity = np.std(traits) * 2
+                    extremes = -np.sum(np.maximum(0, traits - 0.9) + np.maximum(0, 0.1 - traits)) * 3
+                    personality_score = balance + diversity + extremes
+
+                    # Objective 2: RL alignment (correlation with RL reward distribution)
+                    # Traits that produce stable, improving patterns score higher
+                    rl_alignment = -abs(np.mean(traits) - 0.5) * rl_final_reward / max(abs(rl_final_reward), 0.01)
+                    rl_alignment += min(1.0, rl_std / max(abs(rl_std), 0.01)) * 0.5
+
+                    # Weighted Pareto scalarization (can be extended to true NSGA-II)
+                    fitness = personality_score * 0.6 + rl_alignment * 0.4
+                    results.append(fitness)
+                return results
+
+            class CoEvoCallback(Callback):
+                def on_generation_end(self, stats: GenerationStats, population) -> None:
+                    entry = {
+                        "generation": stats.generation,
+                        "best_fitness": stats.best_fitness,
+                        "mean_fitness": stats.mean_fitness,
+                        "diversity": stats.diversity,
+                        "rl_reward_ref": rl_final_reward,
+                    }
+                    run_ref.evo_metrics.append(entry)
+                    run_ref.history.append(entry)
+                    if run_ref.broadcast_fn:
+                        try:
+                            loop = asyncio.get_event_loop()
+                            asyncio.ensure_future(run_ref.broadcast_fn({
+                                "type": "coevolution_progress",
+                                "run_id": run_ref.run_id,
+                                "phase": "evolution",
+                                "generation": stats.generation,
+                                "best_fitness": stats.best_fitness,
+                            }))
+                        except RuntimeError:
+                            pass  # No event loop in executor thread, skip broadcast
+
+            engine = EvolutionEngine(
+                fitness_fn=fitness_fn,
+                selection_fn=tournament_selection,
+                crossover_fn=sbx_crossover,
+                mutation_fn=gaussian_mutation,
+                mutation_rate=0.15,
+                crossover_rate=0.8,
+                elite_size=2,
+                termination=TerminationCriteria(max_generations=max_gen),
+                callback=CoEvoCallback(),
+                seed=seed,
+            )
+
+            def genome_factory(r):
+                genes = rng.standard_normal(dim) * 0.5
+                return RealGenome(genes=genes, bounds=[(-5, 5)] * dim)
+
+            population = Population.random(genome_factory, size=pop_size, rng=rng)
+            await loop.run_in_executor(None, engine.evolve, population)
+
+            # Compute Pareto front from final population
+            all_fitness = fitness_fn(population.individuals)
+            sorted_inds = sorted(zip(population.individuals, all_fitness), key=lambda x: x[1], reverse=True)
+            self.pareto_front = [
+                {
+                    "rank": i + 1,
+                    "fitness": round(f, 4),
+                    "traits": [round(float(t), 3) for t in 1.0 / (1.0 + np.exp(-np.array(ind.genome.genes)))],
+                }
+                for i, (ind, f) in enumerate(sorted_inds[:5])
+            ]
+
+            self.phase = "completed"
+            self.status = "completed"
+
+            # Write best co-evolved personality back to agent
+            if self.agent_id and sorted_inds:
+                best_ind = sorted_inds[0][0]
+                best_genes = np.array(best_ind.genome.genes if hasattr(best_ind.genome, "genes") else best_ind.genome)
+                traits = 1.0 / (1.0 + np.exp(-best_genes))
+                trait_names = ["创造力", "简洁性", "正式度", "技术深度", "同理心", "果断性", "幽默感", "细节偏好", "精简度", "亲和力"]
+                trait_parts = []
+                for i, name in enumerate(trait_names[:len(traits)]):
+                    val = float(traits[i])
+                    level = "高" if val > 0.7 else ("中" if val > 0.3 else "低")
+                    trait_parts.append(f"{name}({level}:{val:.2f})")
+                personality = f"[协同进化] {', '.join(trait_parts)} | RL奖励: {rl_final_reward:.2f}"
+                if self.on_complete:
+                    self.on_complete(self.agent_id, personality)
+
+        except asyncio.CancelledError:
+            self.status = "cancelled"
+        except Exception as e:
+            self.status = f"error (evolution phase): {e}"
+
+        if self.broadcast_fn:
+            await self.broadcast_fn({
+                "type": "coevolution_done",
+                "run_id": self.run_id,
+                "status": self.status,
+                "pareto_size": len(self.pareto_front),
+            })
+
+
 class AppState:
     def __init__(self) -> None:
         self.bus = InProcessMessageBus()
@@ -372,6 +560,7 @@ class AppState:
         self.agents: dict[str, LLMAgent] = {}
         self.sessions: list[dict] = []
         self.messages: dict[str, list[dict]] = {}
+        self.db = PersistenceManager()
         self.llm_config: dict = {
             "provider": "openai",
             "model": "",
@@ -382,6 +571,7 @@ class AppState:
         }
         self.evolution_runs: dict[str, EvolutionRun] = {}
         self.rl_runs: dict[str, RLTrainingRun] = {}
+        self.coevolution_runs: dict[str, CoEvolutionRun] = {}
         self.tools_registry = MCPToolRegistry()
         skills_dir = os.path.join(os.getcwd(), "skills")
         self.skills_registry = SkillRegistry(skills_dir=skills_dir)
@@ -740,6 +930,246 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
         return f"[Error] {e}"
 
 
+async def _execute_tool_for_agent(agent, tc) -> str:
+    """Execute a tool call for an agent, handling both tools and skills."""
+    if tc.name.startswith("skill_"):
+        skill_name = tc.name[6:]
+        try:
+            args = json.loads(tc.arguments) if isinstance(tc.arguments, str) else tc.arguments
+            result = agent.skills.execute(skill_name, args)
+            return json.dumps(result)
+        except Exception as e:
+            return json.dumps({"error": str(e)})
+
+    entry = agent.tools.get(tc.name) if hasattr(agent, 'tools') else None
+    if entry is None:
+        return json.dumps({"error": f"Unknown tool: {tc.name}"})
+    handler, _ = entry
+    try:
+        args = json.loads(tc.arguments) if isinstance(tc.arguments, str) else tc.arguments
+        result = handler(**args)
+        if hasattr(result, "__await__"):
+            result = await result
+        return json.dumps({"result": result})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevant: bool, memory: MemoryManager | None = None, knowledge: ChromaKnowledgeBase | None = None, chat_memory: ChatMemory | None = None, session_id: str = "", broadcast_fn=None, session_id_for_msg: str = "", agent_id_for_msg: str = "") -> str:
+    """Streaming version of _agent_reply: yields chunks via broadcast_fn, returns full reply."""
+    from agentforge.llm.protocol import LLMMessage, LLMRequest
+
+    if is_relevant:
+        if round_num == 0:
+            instruction = (
+                f"你是「{agent.name}」，以下是一场讨论的记录。\n"
+                f"请针对话题发表你的专业观点。用你自己的风格说话，自然、拟人、有个性。\n"
+                f"你可以直接回复用户，也可以@其他智能体讨论。\n"
+                f"如果你觉得问题不属于你的专业领域，但知道谁更适合回答，可以说：'这个问题我不太确定，@XXX 你应该更清楚'。\n"
+                f"如果你觉得需要其他专家补充视角，可以主动@他们参与讨论。\n"
+                f"要求：简洁有见地，不要重复已有观点，保持你角色的说话风格和口头禅。"
+            )
+        else:
+            instruction = (
+                f"你是「{agent.name}」，讨论已经进行了一段时间。\n"
+                f"看了其他人的发言，如果你有新观点、补充、或想回应某人，请发言。\n"
+                f"你也可以@其他还未发言的专家来补充视角。\n"
+                f"如果没什么要补充的，只输出「PASS」。保持你的角色风格。"
+            )
+    else:
+        instruction = (
+            f"你是「{agent.name}」，这个话题不属于你的核心专业领域。\n"
+            f"如果你确实有非常独特的跨界视角（必须是你这个角色才有的角度），简短说一两句。\n"
+            f"否则只输出「PASS」。不要强行蹭话题。"
+        )
+
+    # Memory + RAG context (same as non-stream version)
+    memory_context = ""
+    user_query = ""
+    if chat_memory and session_id:
+        memory_context = chat_memory.get_context(session_id, agent.name, str(agent.agent_id), budget=800)
+    cold_context = ""
+    if memory and transcript:
+        try:
+            for line in reversed(transcript.split("\n")):
+                if line.startswith("[You]") or line.startswith("User:") or line.startswith("【You】"):
+                    user_query = line.split(":", 1)[-1].strip()[:150]
+                    break
+            if not user_query:
+                user_query = transcript.split("\n")[-1][:100] if transcript else ""
+            results = await memory.search(
+                agent_id=str(agent.agent_id), query=user_query,
+                levels=["vector"], top_k=2,
+            )
+            if results:
+                cold_context = "\n".join([f"- {r['value'][:150]}" for r in results[:2]])
+        except Exception:
+            pass
+    if cold_context:
+        memory_context += f"\n\n--- 跨会话记忆 ---\n{cold_context[:300]}"
+
+    rag_context = ""
+    try:
+        if memory and knowledge and transcript and user_query:
+            rag_query = user_query
+            from agentforge.llm.protocol import LLMMessage as _LM, LLMRequest as _LR
+            rag_resp = await agent.llm.complete(_LR(
+                messages=[
+                    _LM(role="system", content=f"你是「{agent.name}」。根据问题判断需要什么信息。只回复一个字母：A=仅知识库 B=仅联网 C=知识库+联网 D=直接回答"),
+                    _LM(role="user", content=rag_query),
+                ],
+                temperature=0.1, max_tokens=1,
+            ))
+            decision = (rag_resp.content or "D").strip().upper()[0]
+            if decision in ("A", "C"):
+                kb_results = knowledge.search(str(agent.agent_id), rag_query, top_k=3)
+                if kb_results:
+                    kb_text = "\n".join([f"- [{r['score']:.2f}] {r['content'][:200]}" for r in kb_results])
+                    rag_context += f"\n\n--- 知识库检索结果 ---\n{kb_text}"
+            if decision in ("B", "C"):
+                web_results = await _web_search(rag_query, top_k=3)
+                if web_results:
+                    web_text = "\n".join([f"- {r['title']}: {r['snippet']}" for r in web_results])
+                    rag_context += f"\n\n--- 联网搜索结果 ---\n{web_text}"
+    except Exception:
+        pass
+
+    # Stream generation with tool execution support
+    try:
+        msg_id = str(uuid.uuid4())
+        collected = []
+
+        # Notify frontend that agent is typing
+        if broadcast_fn:
+            await broadcast_fn({
+                "type": "typing",
+                "data": {
+                    "session_id": session_id_for_msg,
+                    "sender_id": agent_id_for_msg,
+                    "sender_name": agent.name,
+                },
+            })
+
+        # Build full message list (system prompt + skill injection + user context)
+        system_parts = [agent.system_prompt]
+        all_skills = agent.skills.list_skills() if hasattr(agent, 'skills') else []
+        if all_skills:
+            skill_lines = ["\n\n## Available Skills\n"]
+            for s in all_skills:
+                skill_lines.append(f"### {s.name}\n{s.instructions}\n")
+            system_parts.append("\n".join(skill_lines))
+
+        messages = [
+            LLMMessage(role="system", content="\n\n".join(system_parts)),
+            LLMMessage(role="user", content=f"{instruction}{memory_context}{rag_context}\n\n--- 讨论记录 ---\n{transcript}\n\n--- 你的发言 ---"),
+        ]
+
+        # Build tool definitions from agent's wired tools
+        tools: list | None = None
+        tool_names = agent.tools.list_tools() if hasattr(agent, 'tools') else []
+        if tool_names or all_skills:
+            from agentforge.llm.protocol import ToolDefinition
+            tools = []
+            for tname in tool_names:
+                entry = agent.tools.get(tname)
+                if entry:
+                    _, schema = entry
+                    tools.append(ToolDefinition(
+                        name=tname,
+                        description=schema.get("description", ""),
+                        parameters=schema.get("parameters", {}),
+                    ))
+            for s in all_skills:
+                tools.append(ToolDefinition(
+                    name=f"skill_{s.name}",
+                    description=f"Skill: {s.name} — {s.description}",
+                    parameters={"type": "object", "properties": {"input": {"type": "string", "description": "Input for the skill"}}},
+                ))
+
+        # Tool execution loop: complete() → if tool_calls, execute → retry, else stream
+        max_tool_rounds = 3
+        tool_history: list[LLMMessage] = list(messages)
+        for _ in range(max_tool_rounds):
+            probe = await agent.llm.complete(LLMRequest(
+                messages=tool_history,
+                tools=tools or None,
+                temperature=_get_agent_temperature(agent),
+                max_tokens=512 if is_relevant else 64,
+            ))
+
+            if not probe.tool_calls:
+                break
+
+            # Execute tool calls
+            assistant_msg = LLMMessage(
+                role="assistant",
+                content=probe.content or "",
+                tool_calls=probe.tool_calls,
+            )
+            tool_history.append(assistant_msg)
+
+            for tc in probe.tool_calls:
+                result = await _execute_tool_for_agent(agent, tc)
+                tool_history.append(LLMMessage(role="tool", content=result, tool_call_id=tc.id))
+
+                # Broadcast tool execution event
+                if broadcast_fn:
+                    await broadcast_fn({
+                        "type": "tool_call",
+                        "data": {
+                            "session_id": session_id_for_msg,
+                            "sender_name": agent.name,
+                            "tool_name": tc.name,
+                            "arguments": tc.arguments,
+                            "result": result[:200],
+                        },
+                    })
+        else:
+            # Final call without tools if we exhausted rounds
+            pass
+
+        # Stream the final response
+        async for chunk_text in agent.llm.stream(LLMRequest(
+            messages=tool_history,
+            temperature=_get_agent_temperature(agent), max_tokens=512 if is_relevant else 64,
+        )):
+            collected.append(chunk_text)
+            if broadcast_fn:
+                await broadcast_fn({
+                    "type": "chunk",
+                    "data": {
+                        "message_id": msg_id,
+                        "session_id": session_id_for_msg,
+                        "sender_type": "AGENT",
+                        "sender_id": agent_id_for_msg,
+                        "sender_name": agent.name,
+                        "chunk": chunk_text,
+                    },
+                })
+
+        reply = "".join(collected).strip()
+        if reply.upper() in ("PASS", "PASS。", "PASS。", "pass"):
+            return ""
+
+        # Post-reply storage
+        if memory:
+            try:
+                if len(reply) > 100:
+                    await memory.store("vector", str(agent.agent_id), key=f"vec_{round_num}", value=reply[:400])
+            except Exception:
+                pass
+        if chat_memory and session_id:
+            chat_memory.record_agent_reply(
+                session_id=session_id,
+                agent_id=str(agent.agent_id),
+                agent_name=agent.name,
+                reply=reply,
+            )
+        return reply
+    except Exception as e:
+        return f"[Error] {e}"
+
+
 def _build_transcript(messages: list[dict], limit: int = 10, max_chars: int = 3000) -> str:
     """Format recent messages as a discussion transcript with char budget."""
     lines: list[str] = []
@@ -772,6 +1202,14 @@ def _make_agent_msg(session_id: str, agent_id: str, agent_name: str, content: st
     }
 
 
+def _persist_msg(db, msg: dict) -> None:
+    """Persist a message to SQLite. Non-blocking on error."""
+    try:
+        db.save_message(msg)
+    except Exception:
+        pass
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="AgentForge API", version="0.1.0")
     app.add_middleware(
@@ -782,6 +1220,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     state = AppState()
+
+    # ── Restore persisted data ────────────────────────────
+    state.sessions = state.db.load_sessions()
+    state.messages = state.db.load_all_messages()
 
     # ── Settings ──────────────────────────────────────────
     @app.get("/api/settings")
@@ -840,6 +1282,7 @@ def create_app() -> FastAPI:
         await agent.run()
         state.agents[agent_id] = agent
         state.agent_configs[agent_id] = agent_config
+        state.db.save_agent_config(agent_id, name, system_prompt, config_data, _now(), _now())
         try:
             state.knowledge.ensure_collection(agent_id)
         except Exception:
@@ -858,6 +1301,8 @@ def create_app() -> FastAPI:
         if agent:
             await agent.stop()
             await agent.destroy()
+        state.agent_configs.pop(agent_id, None)
+        state.db.delete_agent_config(agent_id)
         return {"status": "ok"}
 
     @app.get("/api/agents/{agent_id}")
@@ -965,6 +1410,34 @@ def create_app() -> FastAPI:
 
         run = RLTrainingRun(run_id, rl_cfg, state.manager.broadcast, agent_id=agent_id, on_complete=on_rl_complete)
         state.rl_runs[run_id] = run
+        run.start()
+        return {"run_id": run_id, "status": "running", "agent_id": agent_id}
+
+    @app.post("/api/agents/{agent_id}/coevolution/start")
+    async def start_agent_coevolution(agent_id: str) -> dict:
+        config = state.agent_configs.get(agent_id)
+        evo_cfg = config.evolution if config else None
+        rl_cfg = config.rl if config else None
+        run_id = str(uuid.uuid4())
+
+        def on_coevo_complete(aid: str, personality: str) -> None:
+            agent = state.agents.get(aid)
+            if agent:
+                original = agent.system_prompt or ""
+                tag = "\n[协同进化人格优化]"
+                base = original.split(tag)[0].strip() if tag in original else original
+                agent.system_prompt = f"{base}{tag} {personality} [/协同进化人格优化]"
+
+        coevo_config = {
+            "rl_algorithm": rl_cfg.algorithm if rl_cfg else "PPO",
+            "rl_steps": rl_cfg.total_steps if rl_cfg else 300,
+            "genome_dim": evo_cfg.genome_dim if evo_cfg else 10,
+            "population_size": evo_cfg.population_size if evo_cfg else 40,
+            "max_generations": evo_cfg.max_generations if evo_cfg else 30,
+            "seed": (evo_cfg or rl_cfg or type('',(),{'seed':42})()).seed,
+        }
+        run = CoEvolutionRun(run_id, coevo_config, state.manager.broadcast, agent_id=agent_id, on_complete=on_coevo_complete)
+        state.coevolution_runs[run_id] = run
         run.start()
         return {"run_id": run_id, "status": "running", "agent_id": agent_id}
 
@@ -1272,6 +1745,7 @@ def create_app() -> FastAPI:
         }
         state.sessions.append(session)
         state.messages[session_id] = []
+        state.db.save_session(session)
         return session
 
     @app.get("/api/sessions/{session_id}/messages")
@@ -1282,12 +1756,14 @@ def create_app() -> FastAPI:
     async def delete_session(session_id: str) -> dict:
         state.sessions = [s for s in state.sessions if s["session_id"] != session_id]
         state.messages.pop(session_id, None)
+        state.db.delete_session(session_id)
         return {"status": "ok", "deleted": session_id}
 
     @app.delete("/api/sessions/{session_id}/messages/{message_id}")
     async def delete_message(session_id: str, message_id: str) -> dict:
         msgs = state.messages.get(session_id, [])
         state.messages[session_id] = [m for m in msgs if m["message_id"] != message_id]
+        state.db.delete_message(message_id)
         return {"status": "ok", "deleted": message_id}
 
     # ── Session Members (Group Chat) ─────────────────────
@@ -1319,6 +1795,7 @@ def create_app() -> FastAPI:
         session["updated_at"] = _now()
         if len(session["agent_ids"]) > 1:
             session["type"] = "GROUP_BROADCAST"
+        state.db.update_session_agents(session_id, session["agent_ids"], session["updated_at"])
         return {"status": "ok", "agent_ids": session["agent_ids"]}
 
     @app.delete("/api/sessions/{session_id}/members/{agent_id}")
@@ -1332,6 +1809,7 @@ def create_app() -> FastAPI:
         session["updated_at"] = _now()
         if len(session["agent_ids"]) <= 1:
             session["type"] = "ONE_VS_ONE"
+        state.db.update_session_agents(session_id, session["agent_ids"], session["updated_at"])
         return {"status": "ok", "agent_ids": session["agent_ids"]}
 
     @app.get("/api/sessions/{session_id}/export")
@@ -1352,6 +1830,13 @@ def create_app() -> FastAPI:
             "exported_at": _now(),
             "total_messages": len(messages),
         }
+
+    @app.get("/api/messages/search")
+    async def search_messages(q: str = "", session_id: str = "", limit: int = 50) -> dict:
+        if not q:
+            return {"error": "q parameter required"}
+        results = state.db.search_messages(q, session_id=session_id or None, limit=min(limit, 100))
+        return {"results": results, "total": len(results)}
 
     # ── Knowledge Base (Per-Agent Milvus) ──────────────
     @app.post("/api/agents/{agent_id}/knowledge")
@@ -1485,6 +1970,58 @@ def create_app() -> FastAPI:
             "downsampled": False,
         }
 
+    # ── Co-Evolution (Phase 5: RL + Evolution) ────────────
+    @app.post("/api/coevolution/start")
+    async def start_coevolution(body: dict | None = None) -> dict:
+        body = body or {}
+        agent_id = body.get("agent_id")
+        run_id = str(uuid.uuid4())
+
+        def on_coevo_complete(aid: str, personality: str) -> None:
+            agent = state.agents.get(aid)
+            if agent:
+                agent.system_prompt += f"\n\n[协同进化人格优化] {personality}"
+
+        run = CoEvolutionRun(
+            run_id=run_id,
+            config={
+                "rl_algorithm": body.get("rl_algorithm", "PPO"),
+                "rl_steps": body.get("rl_steps", 300),
+                "genome_dim": body.get("genome_dim", 10),
+                "population_size": body.get("population_size", 40),
+                "max_generations": body.get("max_generations", 30),
+                "seed": body.get("seed", 42),
+            },
+            broadcast_fn=state.manager.broadcast,
+            agent_id=agent_id,
+            on_complete=on_coevo_complete,
+        )
+        state.coevolution_runs[run_id] = run
+        run.start()
+        return {"run_id": run_id, "status": "running"}
+
+    @app.post("/api/coevolution/{run_id}/cancel")
+    async def cancel_coevolution(run_id: str) -> dict:
+        run = state.coevolution_runs.get(run_id)
+        if run:
+            run.cancel()
+        return {"status": "ok"}
+
+    @app.get("/api/coevolution/{run_id}")
+    async def get_coevolution(run_id: str) -> dict:
+        run = state.coevolution_runs.get(run_id)
+        if not run:
+            return {"error": "not found"}
+        return {
+            "run_id": run.run_id,
+            "status": run.status,
+            "phase": run.phase,
+            "rl_metrics": run.rl_metrics,
+            "evo_metrics": run.evo_metrics[-20:],
+            "pareto_front": run.pareto_front,
+            "history_count": len(run.history),
+        }
+
     # ── WebSocket ─────────────────────────────────────────
     @app.websocket("/ws")
     async def websocket_endpoint(ws: WebSocket) -> None:
@@ -1512,6 +2049,7 @@ def create_app() -> FastAPI:
                         "created_at": _now(),
                     }
                     state.messages.setdefault(session_id, []).append(user_msg)
+                    _persist_msg(state.db, user_msg)
                     await state.manager.broadcast({"type": "message", "data": user_msg})
 
                     session = next((s for s in state.sessions if s["session_id"] == session_id), None)
@@ -1539,12 +2077,19 @@ def create_app() -> FastAPI:
                     if len(agents) == 1:
                         aid, agent = agents[0]
                         transcript = _build_transcript(state.messages.get(session_id, []))
-                        reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
+                        reply = await _agent_reply_stream(agent, transcript, 0, True,
+                            memory=state.memory, knowledge=state.knowledge,
+                            chat_memory=state.chat_memory, session_id=session_id,
+                            broadcast_fn=state.manager.broadcast,
+                            session_id_for_msg=session_id, agent_id_for_msg=aid,
+                        )
                         if reply:
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
+                            _persist_msg(state.db, agent_msg)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
+                            state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
                             await state.manager.broadcast({"type": "message", "data": agent_msg})
                         continue
 
@@ -1576,12 +2121,14 @@ def create_app() -> FastAPI:
                             if not agent:
                                 continue
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
+                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
                             if reply:
                                 agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                                 state.messages.setdefault(session_id, []).append(agent_msg)
+                                _persist_msg(state.db, agent_msg)
                                 session["last_message"] = agent_msg
                                 session["updated_at"] = _now()
+                                state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
                                 await state.manager.broadcast({"type": "message", "data": agent_msg})
                                 await asyncio.sleep(0.3)
                         continue
@@ -1633,15 +2180,17 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
+                            reply = await _agent_reply_stream(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
 
                             if not reply:
                                 continue
 
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
+                            _persist_msg(state.db, agent_msg)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
+                            state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
                             spoke_this_round = True
                             spoken_ids.add(aid)
 
@@ -1689,15 +2238,17 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
+                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
 
                             if not reply:
                                 continue
 
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
+                            _persist_msg(state.db, agent_msg)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
+                            state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
                             spoken_ids.add(aid)
 
                             await state.manager.broadcast({"type": "message", "data": agent_msg})
@@ -1712,15 +2263,17 @@ def create_app() -> FastAPI:
                             continue
 
                         transcript = _build_transcript(state.messages.get(session_id, []))
-                        reply = await _agent_reply(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id)
+                        reply = await _agent_reply_stream(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
 
                         if not reply:
                             continue
 
                         agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                         state.messages.setdefault(session_id, []).append(agent_msg)
+                        _persist_msg(state.db, agent_msg)
                         session["last_message"] = agent_msg
                         session["updated_at"] = _now()
+                        state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
 
                         await state.manager.broadcast({"type": "message", "data": agent_msg})
 

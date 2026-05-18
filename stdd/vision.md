@@ -1,6 +1,6 @@
 # AgentForge — 项目愿景
 
-> 版本: 2.0 | 更新: 2026-05-16
+> 版本: 3.0 | 更新: 2026-05-18
 > 方法论: STDD (Spec-Driven Test-Driven Development)
 
 ---
@@ -57,7 +57,7 @@ Agent 框架 (AgentForge)
 │                   AgentForge API                     │
 │  Agents CRUD │ Tools CRUD │ Skills CRUD │ MCP CRUD  │
 │  Skills URL Install │ MCP npm Install │ LLM Profiles│
-│  Evolution │ RL │ Training History │ WebSocket       │
+│  Evolution │ RL │ CoEvolution │ Training History │ WebSocket    │
 ├─────────────────────────────────────────────────────┤
 │                Per-Agent Wiring                      │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
@@ -67,12 +67,17 @@ Agent 框架 (AgentForge)
 │  │ LLM: GPT │ │ LLM:本地 │ │ LLM: Claude│          │
 │  │ evo: on  │ │ evo: off │ │ evo: on  │            │
 │  │ rl: PPO  │ │ rl: DQN  │ │ rl: off  │            │
+│  │ coevo:✓  │ │ coevo:✓  │ │ coevo:✗  │            │
 │  └──────────┘ └──────────┘ └──────────┘            │
 ├───────────────────┬─────────────────────────────────┤
 │    RLForge        │           EvoForge               │
 │  PPO/DQN/REINFORCE│  Selection/Crossover/Mutation   │
 │  Replay+Target    │  Fitness/Termination/Callback    │
 ├───────────────────┴─────────────────────────────────┤
+│              CoEvolution (Phase 5)                    │
+│  RL training → Reward stats → Enhanced fitness      │
+│  60% personality + 40% RL alignment → Pareto front  │
+├─────────────────────────────────────────────────────┤
 │              Skill System (SKILL.md)                 │
 │  OpenClaw compatible │ YAML frontmatter │ 指令注入  │
 ├─────────────────────────────────────────────────────┤
@@ -140,11 +145,14 @@ Agent 框架 (AgentForge)
 - [x] 预设 AI 专家团队：启动自动创建 9 个角色（程序员/哲学家/数学家/ML工程师/DL工程师/RL工程师/C++工程师/推理工程师/前端工程师）+ 群聊会话
 - [x] Agentic RAG：Per-Agent ChromaDB 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索策略
 
-### Phase 5: 协同进化 (待开发)
+### Phase 5: 协同进化 ✅
 
-- [ ] RL + Evolution 协同优化
-- [ ] 策略编码为基因组 → 进化优化 → RL fine-tune
-- [ ] 多目标 Pareto 优化
+- [x] CoEvolutionRun: RL 训练 → 奖励统计注入进化适应度 → 多目标进化
+- [x] RL 增强适应度函数（60% 人格质量 + 40% RL 对齐）
+- [x] Pareto 前沿排名（Top 5 个体）
+- [x] 流式输出（WebSocket chunk 协议 + typing 指示器）
+- [x] 消息持久化（SQLite write-through + 重启自动恢复）
+- [x] 工具执行闭环（ReAct 循环 + MCP/Skill 工具调用）
 
 ### Phase 6: 生产就绪 (待开发)
 
@@ -159,7 +167,11 @@ Agent 框架 (AgentForge)
 | 后端导入 | 全模块零错误 | ✅ 通过 |
 | 前端编译 | TypeScript 零错误 | ✅ 通过 |
 | 前端测试 | 47 tests | ✅ 全部通过 |
-| API 端点 | 50 个路由 | ✅ 全部注册 |
+| API 端点 | 55 个路由 | ✅ 全部注册 |
+| 协同进化 | RL→Evo 两阶段 + Pareto 前沿 | ✅ 端到端验证通过 |
+| 流式输出 | chunk + typing + auto-scroll | ✅ 9 chunks 验证通过 |
+| 消息持久化 | SQLite 三表 + 重启恢复 | ✅ 验证通过 |
+| 工具执行 | ReAct loop + tool_call 事件 | ✅ 验证通过 |
 | OpenClaw 兼容 | SKILL.md 读写 + 门控 | ✅ 通过 |
 | 技能互操作 | 双向零转换 | ✅ 验证通过 |
 | 在线安装 | Skill URL + MCP npm | ✅ 验证通过 |
