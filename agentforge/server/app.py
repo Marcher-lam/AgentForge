@@ -733,7 +733,6 @@ async def _agent_reply(agent, transcript: str, round_num: int, is_relevant: bool
                 agent_id=str(agent.agent_id),
                 agent_name=agent.name,
                 reply=reply,
-                agent_ids=list(state.agents.keys()) if hasattr(state, 'agents') else None,
             )
         # Knowledge base: only store user-uploaded knowledge, not chat replies
         return reply
