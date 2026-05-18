@@ -1393,20 +1393,15 @@ def create_app() -> FastAPI:
 
     @app.get("/api/knowledge/template")
     async def knowledge_template() -> dict:
-        """Return the empty knowledge JSON template with field descriptions."""
+        """Return the knowledge JSON template with examples and field descriptions."""
+        import pathlib
+        tpl_path = pathlib.Path(__file__).resolve().parent.parent.parent / "schemas" / "knowledge-template.json"
+        if tpl_path.exists():
+            return json.loads(tpl_path.read_text(encoding="utf-8"))
         return {
-            "_comment": "AgentForge 知识库 JSON 模板 — 复制此文件填入知识内容后上传",
+            "_comment": "AgentForge 知识库 JSON 模板",
             "_schema_version": "1.0",
-            "_fields_guide": {
-                "id": "(可选) 文档唯一标识，留空则自动生成。最长 256 字符",
-                "text": "(必填) 知识正文内容。支持中英文，最长 8192 字符",
-                "source": "(可选) 来源标识，如 'company-wiki', 'product-spec'",
-                "title": "(可选) 文档标题，便于检索结果展示",
-                "tags": "(可选) 标签数组，用于分类过滤",
-            },
-            "documents": [
-                {"id": "", "text": "", "source": "", "title": "", "tags": []},
-            ],
+            "documents": [{"id": "", "text": "", "source": "", "title": "", "tags": []}],
         }
 
     # ── Evolution ─────────────────────────────────────────

@@ -1,30 +1,56 @@
 {
-  "_comment": "AgentForge 知识库 JSON 模板 — 请勿修改此文件，复制后填入知识内容上传",
+  "_comment": "AgentForge 知识库 JSON 模板 — 复制此文件，填入知识内容后上传",
   "_schema_version": "1.0",
   "_fields_guide": {
-    "id": "(可选) 文档唯一标识，留空则自动生成。最长 256 字符",
-    "text": "(必填) 知识正文内容。支持中英文，最长 8192 字符。每条尽量聚焦一个知识点",
+    "id": "(可选) 文档唯一标识，留空自动生成，最长 256 字符",
+    "text": "(必填) 知识正文，中英文均可，最长 8192 字符，建议每条 100-2000 字聚焦一个知识点",
     "source": "(可选) 来源标识，如 'company-wiki', 'product-spec', 'api-doc'",
     "title": "(可选) 文档标题，便于检索结果展示",
     "tags": "(可选) 标签数组，用于分类过滤，如 ['技术', 'API', '入门']"
   },
   "documents": [
     {
-      "id": "",
-      "text": "在这里写入第一条知识内容。建议每条聚焦一个独立知识点，长度 100-2000 字效果最佳。系统会自动使用 BAAI/bge-small-en-v1.5 模型将文本转换为 384 维语义向量存入 Milvus。",
-      "source": "example-source",
-      "title": "示例：知识条目格式说明",
-      "tags": ["模板", "说明"]
+      "id": "doc-001",
+      "text": "PPO（Proximal Policy Optimization）是一种策略梯度强化学习算法。它在每步更新时通过 clip 机制限制新旧策略的比值范围，避免单次更新步幅过大导致训练崩溃。PPO 的核心损失函数为 L = min(r(θ)·A, clip(r(θ), 1-ε, 1+ε)·A)，其中 r(θ) 是新旧策略概率比，A 是优势函数，ε 通常取 0.1-0.2。相比 TRPO 的二阶优化，PPO 只需一阶梯度，计算效率更高，是目前最广泛使用的 RL 算法之一。",
+      "source": "rl-textbook",
+      "title": "PPO 算法核心原理",
+      "tags": ["强化学习", "PPO", "策略梯度"]
     },
     {
-      "id": "",
-      "text": "每条知识条目可以有独立的来源和标签。来源(source)用于区分不同文档库，标签(tags)用于分类过滤。上传后可通过语义搜索检索相关内容。",
-      "source": "example-source",
-      "title": "示例：字段用途说明",
-      "tags": ["模板", "说明", "字段"]
+      "id": "doc-002",
+      "text": "REST API 设计最佳实践：1) 使用名词复数形式作为资源路径（如 /api/users 而非 /api/getUser）；2) 用 HTTP 方法表达操作语义（GET 查询、POST 创建、PUT 全量更新、PATCH 部分更新、DELETE 删除）；3) 使用查询参数做过滤和分页（?page=1&size=20&status=active）；4) 返回合适的 HTTP 状态码（201 Created、400 Bad Request、404 Not Found、500 Internal Server Error）；5) 对外暴露的 API 版本化（/api/v1/users），方便后续迭代。",
+      "source": "backend-style-guide",
+      "title": "REST API 设计规范",
+      "tags": ["API", "REST", "后端", "规范"]
     },
     {
-      "id": "",
+      "id": "doc-003",
+      "text": "React 性能优化关键策略：1) 使用 React.memo 避免纯 props 组件不必要的重渲染；2) 用 useMemo 缓存计算结果、useCallback 缓存回调函数引用；3) 列表渲染务必提供稳定的 key（不要用 index）；4) 拆分大组件为更小的子组件，缩小渲染范围；5) 对长列表使用虚拟滚动（如 react-window / @tanstack/react-virtual）；6) 用 Suspense + lazy 做路由级代码分割；7) 避免在 render 中创建内联对象和函数。",
+      "source": "frontend-playbook",
+      "title": "React 性能优化指南",
+      "tags": ["前端", "React", "性能"]
+    },
+    {
+      "id": "doc-004",
+      "text": "Git 分支管理策略（Git Flow 适合release周期较长的项目，Trunk-Based 适合持续部署）：推荐使用 Trunk-Based Development —— 主分支 main 保持随时可部署，feature 分支短期存在（1-2天），合并前必须通过 CI。提交信息格式：type(scope): description，type 包括 feat/fix/docs/refactor/test/chore。示例：feat(auth): add JWT token refresh endpoint。每个 commit 保持原子性，一个 commit 只做一件事。",
+      "source": "engineering-handbook",
+      "title": "Git 分支管理与提交规范",
+      "tags": ["Git", "工程规范", "协作"]
+    },
+    {
+      "id": "doc-005",
+      "text": "向量数据库选型对比：Milvus 适合大规模（亿级）向量检索，支持分布式部署和多种索引类型（IVF/HNSC/ANNOY），社区活跃但运维复杂度较高；Chroma 轻量嵌入式，适合快速原型和小规模场景（百万级以内），Python 原生无需额外服务；Qdrant 基于 Rust 实现，单节点性能优秀，提供丰富的过滤条件。选择建议：原型验证用 Chroma，生产环境根据规模和团队技术栈选 Milvus 或 Qdrant。",
+      "source": "tech-review",
+      "title": "向量数据库选型对比",
+      "tags": ["向量数据库", "Milvus", "Chroma", "架构"]
+    },
+    {
+      "text": "",
+      "source": "",
+      "title": "",
+      "tags": []
+    },
+    {
       "text": "",
       "source": "",
       "title": "",
