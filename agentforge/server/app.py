@@ -1391,6 +1391,24 @@ def create_app() -> FastAPI:
         state.knowledge.delete_collection(agent_id)
         return {"status": "ok"}
 
+    @app.get("/api/knowledge/template")
+    async def knowledge_template() -> dict:
+        """Return the empty knowledge JSON template with field descriptions."""
+        return {
+            "_comment": "AgentForge 知识库 JSON 模板 — 复制此文件填入知识内容后上传",
+            "_schema_version": "1.0",
+            "_fields_guide": {
+                "id": "(可选) 文档唯一标识，留空则自动生成。最长 256 字符",
+                "text": "(必填) 知识正文内容。支持中英文，最长 8192 字符",
+                "source": "(可选) 来源标识，如 'company-wiki', 'product-spec'",
+                "title": "(可选) 文档标题，便于检索结果展示",
+                "tags": "(可选) 标签数组，用于分类过滤",
+            },
+            "documents": [
+                {"id": "", "text": "", "source": "", "title": "", "tags": []},
+            ],
+        }
+
     # ── Evolution ─────────────────────────────────────────
     @app.post("/api/evolution/start")
     async def start_evolution(body: dict) -> dict:

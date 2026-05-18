@@ -506,9 +506,31 @@ export function AgentGrid({ agents, apiBase, onSelect, onAgentsChanged }: AgentG
               {/* Knowledge JSON Upload */}
               <section className="border rounded-xl p-3 bg-purple-50">
                 <h4 className="text-sm font-semibold text-gray-700 mb-1">专属知识库（Milvus）</h4>
-                <p className="text-xs text-gray-500 mb-3">
-                  上传预处理后的 JSON 文件。格式：{"{\"documents\":[{\"text\":\"知识内容\",\"metadata\":{\"source\":\"doc\"}}]}"}
+                <p className="text-xs text-gray-500 mb-2">
+                  上传 JSON 知识文件，每条包含 text(必填) + source/title/tags(可选)
                 </p>
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    className="text-xs border border-purple-400 text-purple-700 px-3 py-1.5 rounded hover:bg-purple-100 transition-colors"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`${apiBase}/api/knowledge/template`);
+                        const tpl = await res.json();
+                        const blob = new Blob([JSON.stringify(tpl, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'knowledge-template.json';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch { /* ignore */ }
+                    }}
+                  >
+                    下载空模板
+                  </button>
+                  <span className="text-xs text-gray-400">下载后填入知识内容再上传</span>
+                </div>
                 <label className="inline-flex items-center gap-2 text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700 cursor-pointer disabled:opacity-50">
                   <input
                     type="file"
