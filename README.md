@@ -373,6 +373,18 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | GET | `/api/agents/{id}/evolution/runs` | 获取 Agent 进化训练历史 |
 | GET | `/api/agents/{id}/rl/runs` | 获取 Agent RL 训练历史 |
 
+### 知识库管理（Milvus / Per-Agent）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/agents/{id}/knowledge` | 兼容旧接口：直接上传 `texts` 数组 |
+| POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件到该 Agent 的 Milvus collection |
+| GET | `/api/agents/{id}/knowledge/search?q=关键词` | 语义检索该 Agent 的专属知识库 |
+| GET | `/api/agents/{id}/knowledge/stats` | 查看该 Agent 知识库文档数 |
+| DELETE | `/api/agents/{id}/knowledge` | 删除该 Agent 的 Milvus collection |
+
+**JSON 上传格式**：用户自行预处理知识为 `documents` 数组，每条包含 `text/content` 与可选 `metadata/source/title/tags`。
+
 ### 工具管理
 
 | 方法 | 路径 | 说明 |
@@ -443,7 +455,7 @@ cd frontend && npx tsc --noEmit
 | Tab | 功能 |
 |-----|------|
 | 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格 |
-| 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），点击跳转对话 |
+| 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持上传 JSON 知识文件到该 Agent 的 Milvus 专属知识库，点击跳转对话 |
 | 监控 | 消息流监控面板（统计条/类型筛选/自动滚动切换） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |
 | 设置 | 模型配置（多 Provider 卡片）+ MCP 服务（手动/在线 npm 安装）+ 技能管理（在线 URL/本地路径/文本安装） |
