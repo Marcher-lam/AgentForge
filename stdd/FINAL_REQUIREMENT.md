@@ -54,8 +54,8 @@
 - 复杂度热点: `should_terminate` (CC=12), `publish` (CC=11)
 
 **已知问题**:
-- P0: websocket.py:54 subscribe 帧解析 KeyError
-- P1: asyncio/anyio 混用 (12 处 asyncio vs 3 处 anyio)
+- ~~P0: websocket.py subscribe 帧解析 KeyError~~ ✅ 已修复
+- ~~P1: asyncio/anyio 混用~~ ✅ 已修复
 - P2: MemoryStore Protocol 与三层记忆设计不匹配
 
 ### 2.2 Evolution-Engine (agentforge/evoforge/)
@@ -168,7 +168,7 @@
                 │  Integration     │  16 tests (6 agent-bus + 2 WS + 4 evo + 4 frontend)
                 │                  │
             ┌───┴──────────────────┴───┐
-            │  Unit                     │  228 tests (Python: 187, Vitest: 41)
+            │  Unit                     │  345 tests (Python: 298, Vitest: 47)
             │                           │
             └───────────────────────────┘
 ```
@@ -228,8 +228,8 @@
 
 | ID | 描述 | 影响 |
 |----|------|------|
-| BUG-1 | websocket.py subscribe 帧解析 KeyError | 跨进程订阅功能不可用 |
-| FIX-1 | asyncio/anyio 混用统一 | trio backend 下系统崩溃 |
+| ~~BUG-1~~ | ~~websocket.py subscribe 帧解析 KeyError~~ ✅ 已修复 | 测试帧格式对齐 |
+| ~~FIX-1~~ | ~~asyncio/anyio 混用统一~~ ✅ 已修复 | 统一 asyncio.Lock |
 
 ### P1 — Phase 2 需求
 
@@ -280,8 +280,8 @@
 
 | 类别 | 数量 | 示例 |
 |------|------|------|
-| 已修复 bug | 3 | 消息丢失, 异常隔离, MCP handler **kwargs |
-| 未修复 bug | 1 | websocket subscribe 帧崩溃 |
+| 已修复 bug | 5 | subscribe KeyError, asyncio 混用, LLM state 未定义, 前端 jsdom, 组件测试 |
+| 未修复 bug | 0 | — |
 | 空目录/stubs | 1 | rlforge/multi_agent/ (仅 __init__.py) |
 
 ---
