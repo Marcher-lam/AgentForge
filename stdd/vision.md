@@ -159,7 +159,7 @@ Agent 框架 (AgentForge)
 | 后端导入 | 全模块零错误 | ✅ 通过 |
 | 前端编译 | TypeScript 零错误 | ✅ 通过 |
 | 前端测试 | 47 tests | ✅ 全部通过 |
-| API 端点 | 49 个路由 | ✅ 全部注册 |
+| API 端点 | 50 个路由 | ✅ 全部注册 |
 | OpenClaw 兼容 | SKILL.md 读写 + 门控 | ✅ 通过 |
 | 技能互操作 | 双向零转换 | ✅ 验证通过 |
 | 在线安装 | Skill URL + MCP npm | ✅ 验证通过 |

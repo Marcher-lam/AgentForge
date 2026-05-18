@@ -20,7 +20,7 @@
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
 | 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
-| API 端点 | 49 REST/WebSocket 路由 |
+| API 端点 | 50 REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | 状态管理 | Jotai atoms |
 
@@ -110,6 +110,8 @@ AgentForge/
 ├── skills/                            # 技能目录（SKILL.md 格式）
 │   ├── code-review/SKILL.md           # 代码审查技能
 │   └── web-search/SKILL.md            # 网络搜索技能
+├── schemas/                           # JSON Schema 模板
+│   └── knowledge-template.json        # 知识库上传空模板
 ├── frontend/                          # React 前端
 │   ├── src/
 │   │   ├── App.tsx                    # 主应用（WebSocket + REST + 聊天管理）
@@ -236,6 +238,7 @@ AgentForge/
 | POST | `/api/agents/{id}/knowledge` | 兼容旧接口：上传 texts 数组 |
 | POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件（用户预处理 documents 格式） |
 | GET | `/api/agents/{id}/knowledge/search?q=关键词` | 语义检索知识 |
+| GET | `/api/knowledge/template` | 下载知识库 JSON 空模板（含字段说明） |
 
 ### 4.3 Per-Agent 独立配置
 
@@ -459,6 +462,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | POST | `/api/agents/{id}/knowledge` | 兼容旧接口：上传 texts 数组 |
 | POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件（用户预处理 documents 格式） |
 | GET | `/api/agents/{id}/knowledge/search` | 语义检索知识（?q=关键词&top_k=5） |
+| GET | `/api/knowledge/template` | 下载知识库 JSON 空模板 |
 
 ### 5.3 LLM Profile 管理
 
@@ -532,7 +536,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | Tab | 功能描述 |
 |-----|----------|
 | **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。现代 IM 风格 UI：渐变圆形头像（12 种角色配色）、Per-Agent 独立色调气泡、完整 Markdown 渲染（标题/代码块/表格/列表/引用）+ LaTeX 公式（KaTeX 行内 `$...$` / 块级 `$$...$$`）+ 代码语法高亮（highlight.js）。@提及仅展示当前会话成员（非全局 Agent）。群聊成员管理：点击群标识弹出成员面板，支持查看成员、邀请新成员、移出成员（类微信群交互）。启动自带"AI 专家团队"群聊（10 个预设角色）。支持删除会话（带确认）、导出聊天记录 |
-| **智能体** | 卡片式管理。创建时一步配齐 LLM Provider/Model + 技能 + MCP + 进化参数 + RL 参数。渐变头像、能力徽章、per-agent 配置。详情弹窗支持上传 JSON 知识文件到该 Agent 的 Milvus 专属 collection。点击跳转对话 |
+| **智能体** | 卡片式管理。创建时一步配齐 LLM Provider/Model + 技能 + MCP + 进化参数 + RL 参数。渐变头像、能力徽章、per-agent 配置。详情弹窗支持下载 JSON 空模板 + 上传知识文件到 Milvus 专属 collection。点击跳转对话 |
 | **监控** | 消息流监控面板。统计条（消息总数/Agent 分布）、类型筛选、自动滚动切换 |
 | **仪表盘** | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 + LTTB 大数据降采样 |
 | **设置** | 多 Provider LLM 卡片（启动自动创建默认卡片）+ MCP 服务（手动 + 在线 npm 安装）+ 技能管理（在线 URL + 路径 + 文本安装） |
@@ -768,7 +772,7 @@ interface RLRun {
 | 后端测试 | 298 passed / 0 failed / 9 skipped |
 | 后端测试文件 | 29（19 unit + 6 integration + 4 e2e） |
 | 前端测试 | 47 vitest 全部通过 |
-| API 端点 | 49 REST/WebSocket 路由 |
+| API 端点 | 50 REST/WebSocket 路由 |
 | 后端 LOC | 7,389 行（不含 __init__.py） |
 | 前端 LOC | 1,129 行 |
 | 测试 LOC | 5,645 行 |

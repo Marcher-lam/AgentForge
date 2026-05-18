@@ -100,6 +100,8 @@ AgentForge/
 ├── skills/                        # 技能目录（SKILL.md 格式，与 OpenClaw 通用）
 │   ├── code-review/SKILL.md       # 代码审查技能
 │   └── web-search/SKILL.md        # 网络搜索技能
+├── schemas/                       # JSON Schema 模板
+│   └── knowledge-template.json    # 知识库上传空模板（含字段说明）
 ├── frontend/                      # React 前端
 │   └── src/
 │       ├── App.tsx                # 主应用（WebSocket + REST 轮询）
@@ -325,18 +327,19 @@ Per-session 双轨设计——**共享全量记忆 + Agent 独立标记**：
 - 启动时自动 seed 角色专属知识（程序员→设计模式/DevOps，RL工程师→PPO/DQN...）
 
 ```bash
-# JSON 知识文件格式（用户自行预处理）
+# 下载空模板（含字段说明）
+curl -o knowledge-template.json http://localhost:8000/api/knowledge/template
+
+# JSON 知识文件格式（填入知识内容后上传）
 cat > knowledge.json <<'JSON'
 {
   "documents": [
     {
       "id": "optional-stable-id",
       "text": "知识内容正文",
-      "metadata": {
-        "source": "doc-name",
-        "title": "标题",
-        "tags": ["tag1", "tag2"]
-      }
+      "source": "doc-name",
+      "title": "标题",
+      "tags": ["tag1", "tag2"]
     }
   ]
 }
@@ -383,6 +386,7 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | GET | `/api/agents/{id}/knowledge/search?q=关键词` | 语义检索该 Agent 的专属知识库 |
 | GET | `/api/agents/{id}/knowledge/stats` | 查看该 Agent 知识库文档数 |
 | DELETE | `/api/agents/{id}/knowledge` | 删除该 Agent 的 Milvus collection |
+| GET | `/api/knowledge/template` | 下载知识库 JSON 空模板（含字段说明） |
 
 **JSON 上传格式**：用户自行预处理知识为 `documents` 数组，每条包含 `text/content` 与可选 `metadata/source/title/tags`。
 
@@ -459,7 +463,7 @@ cd frontend && npx tsc --noEmit
 | Tab | 功能 |
 |-----|------|
 | 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格。@提及仅展示当前会话成员。群聊支持成员管理：查看成员列表、邀请新成员、移出成员（类微信群交互） |
-| 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持上传 JSON 知识文件到该 Agent 的 Milvus 专属知识库，点击跳转对话 |
+| 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持下载空模板 + 上传 JSON 知识文件到 Milvus 专属知识库，点击跳转对话 |
 | 监控 | 消息流监控面板（统计条/类型筛选/自动滚动切换） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |
 | 设置 | 模型配置（多 Provider 卡片）+ MCP 服务（手动/在线 npm 安装）+ 技能管理（在线 URL/本地路径/文本安装） |

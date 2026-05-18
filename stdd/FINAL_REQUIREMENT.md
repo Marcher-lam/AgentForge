@@ -16,7 +16,7 @@
 | 进化引擎 | 遗传算法（锦标赛/SBX/高斯变异 + 人格优化） |
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
-| API 端点 | 49 个 REST/WebSocket 路由 |
+| API 端点 | 50 个 REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | Per-Agent 配置 | LLM/工具/技能/MCP/进化/RL 独立配置 + 多 Provider LLM Profile |
 | 仪表盘 | Agent 卡片网格 + 训练记录左右分栏（日志+图表）+ 图表放大 |

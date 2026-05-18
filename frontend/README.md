@@ -14,7 +14,7 @@ npx vite --host 0.0.0.0 --port 5173
 | Tab | 组件 | 功能 |
 |-----|------|------|
 | 对话 | `App.tsx` (chat tab) | 会话列表（单聊/群聊切换 + 删除确认 + 导出记录）+ 消息面板 + WebSocket 实时通信 |
-| 智能体 | `grid/AgentGrid.tsx` | 卡片式管理 + 创建时一步配齐（LLM/技能/MCP/进化/RL）+ 编辑弹窗 + JSON 知识文件上传到 Milvus 专属知识库 |
+| 智能体 | `grid/AgentGrid.tsx` | 卡片式管理 + 创建时一步配齐（LLM/技能/MCP/进化/RL）+ 编辑弹窗 + 下载空模板 + JSON 知识文件上传到 Milvus 专属知识库 |
 | 监控 | `monitor/MonitorPage.tsx` | 消息流监控（统计条/类型筛选/自动滚动） |
 | 仪表盘 | `dashboard/DashboardPage.tsx` | Agent 卡片网格 → 点击弹出训练记录（左右分栏：日志+图表）+ 放大按钮 |
 | 设置 | `settings/SettingsPage.tsx` | 模型配置（多 Provider 卡片）/ MCP 服务（手动+在线 npm 安装）/ 技能管理（在线 URL+路径+文本安装） |
