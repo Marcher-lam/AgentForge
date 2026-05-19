@@ -15,7 +15,7 @@ npx vite --host 0.0.0.0 --port 5173
 |-----|------|------|
 | 对话 | `App.tsx` (chat tab) | 会话列表（单聊/群聊切换 + 删除确认 + 导出记录）+ 消息面板 + WebSocket 实时通信 + 流式 token 输出 + 打字指示器（XXX 正在输入...）+ 自动滚动 |
 | 智能体 | `grid/AgentGrid.tsx` | 卡片式管理 + 创建时一步配齐（LLM/技能/MCP/进化/RL）+ 编辑弹窗 + 下载空模板 + JSON 知识文件上传到 Milvus 专属知识库 |
-| 监控 | `monitor/MonitorPage.tsx` | 消息流监控（统计条/类型筛选/自动滚动） |
+| 监控 | `monitor/MonitorPage.tsx` | 统一监控面板（系统概览卡片 + 14 种事件类型 + 关键词搜索 + 事件详情 + 3 秒轮询） |
 | 仪表盘 | `dashboard/DashboardPage.tsx` | Agent 卡片网格 → 点击弹出训练记录（左右分栏：日志+图表）+ 放大按钮 |
 | 设置 | `settings/SettingsPage.tsx` | 模型配置（多 Provider 卡片）/ MCP 服务（手动+在线 npm 安装）/ 技能管理（在线 URL+路径+文本安装） |
 
@@ -43,6 +43,8 @@ npx vite --host 0.0.0.0 --port 5173
 - `MCPServerSummary` — MCP 服务器信息
 - `OpenClawSkillSummary` — SKILL.md 格式技能（OpenClaw 兼容）
 - `MonitorMessage` — Agent 间通信消息监控
+- `MonitorEvent` — 监控事件（14 种类型：system/message/typing/chunk/tool_call/llm/rag/memory/rl/evolution/coevolution/persistence/error）
+- `MonitorStats` — 系统监控统计（事件总数/按类型/按严重度/活跃 WebSocket/训练状态）
 
 ## 进化 & RL 训练影响 Agent 行为
 

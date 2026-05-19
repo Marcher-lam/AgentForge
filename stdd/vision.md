@@ -1,6 +1,6 @@
 # AgentForge — 项目愿景
 
-> 版本: 3.0 | 更新: 2026-05-18
+> 版本: 3.1 | 更新: 2026-05-19
 > 方法论: STDD (Spec-Driven Test-Driven Development)
 
 ---
@@ -153,6 +153,7 @@ Agent 框架 (AgentForge)
 - [x] 流式输出（WebSocket chunk 协议 + typing 指示器）
 - [x] 消息持久化（SQLite write-through + 重启自动恢复）
 - [x] 工具执行闭环（ReAct 循环 + MCP/Skill 工具调用）
+- [x] 统一监控系统（MonitorStore 5000 事件环形缓冲 + 14 种事件类型 + 前端实时面板）
 
 ### Phase 6: 生产就绪 (待开发)
 
@@ -167,11 +168,12 @@ Agent 框架 (AgentForge)
 | 后端导入 | 全模块零错误 | ✅ 通过 |
 | 前端编译 | TypeScript 零错误 | ✅ 通过 |
 | 前端测试 | 47 tests | ✅ 全部通过 |
-| API 端点 | 55 个路由 | ✅ 全部注册 |
+| API 端点 | 57 个路由 | ✅ 全部注册 |
 | 协同进化 | RL→Evo 两阶段 + Pareto 前沿 | ✅ 端到端验证通过 |
 | 流式输出 | chunk + typing + auto-scroll | ✅ 9 chunks 验证通过 |
 | 消息持久化 | SQLite 三表 + 重启恢复 | ✅ 验证通过 |
 | 工具执行 | ReAct loop + tool_call 事件 | ✅ 验证通过 |
+| 统一监控 | MonitorStore + 14 事件类型 + 前端面板 | ✅ 7 种事件类型验证通过 |
 | OpenClaw 兼容 | SKILL.md 读写 + 门控 | ✅ 通过 |
 | 技能互操作 | 双向零转换 | ✅ 验证通过 |
 | 在线安装 | Skill URL + MCP npm | ✅ 验证通过 |

@@ -96,7 +96,9 @@ AgentForge/
 │   └── infra/
 │       ├── config.py              # 配置管理
 │       ├── logging.py             # 结构化日志
-│       └── shutdown.py            # 优雅关闭
+│       ├── shutdown.py            # 优雅关闭
+│       ├── persistence.py         # SQLite 消息持久化（WAL 三表 + 重启恢复）
+│       └── monitoring.py          # 统一监控（5000 事件环形缓冲 + 14 种类型）
 ├── skills/                        # 技能目录（SKILL.md 格式，与 OpenClaw 通用）
 │   ├── code-review/SKILL.md       # 代码审查技能
 │   └── web-search/SKILL.md        # 网络搜索技能
@@ -111,7 +113,7 @@ AgentForge/
 │       │   ├── chat/              # 对话面板 + 输入框 + 群聊/删除/导出
 │       │   ├── grid/              # 智能体卡片管理（创建时一步配齐 LLM/技能/MCP/进化/RL）
 │       │   ├── dashboard/         # 仪表盘（Agent 卡片网格 + 训练记录左右分栏 + 图表放大 + 日志表格）
-│       │   ├── monitor/           # 消息监控面板（统计条/类型筛选/自动滚动）
+│       │   ├── monitor/           # 统一监控面板（系统概览 + 14 种事件类型 + 详情面板 + 3 秒轮询）
 │       │   └── settings/          # 设置页（模型配置/MCP服务/技能管理 + 在线安装）
 │       ├── utils/lttb.ts          # LTTB 降采样算法
 │       └── types/api.ts           # API 类型定义（含 AgentConfig/LLMProfile/EvoRun/RLRun/MCPServer/Skill）
@@ -455,6 +457,19 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | GET | `/api/coevolution/{id}` | 查询协同进化状态（Pareto 前沿 + 双阶段进度） |
 | POST | `/api/coevolution/{id}/cancel` | 取消协同进化 |
 
+### 监控系统
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/monitor/events` | 事件列表（支持 type/severity/session_id/agent_id/limit 过滤） |
+| GET | `/api/monitor/stats` | 系统概览（事件统计 + WebSocket 在线数 + 训练状态） |
+
+### 消息搜索
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/messages/search` | 全文搜索消息（?q=关键词） |
+
 ## 测试
 
 ```bash
@@ -474,7 +489,7 @@ cd frontend && npx tsc --noEmit
 |-----|------|
 | 对话 | 会话列表 + 消息面板 + WebSocket 实时通信。现代 IM 风格：渐变圆形头像（按角色配色）、Agent 独立色调气泡、Markdown + LaTeX 渲染、代码语法高亮、GFM 表格。@提及仅展示当前会话成员。群聊支持成员管理：查看成员列表、邀请新成员、移出成员（类微信群交互） |
 | 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持下载空模板 + 上传 JSON 知识文件到 Milvus 专属知识库，点击跳转对话 |
-| 监控 | 消息流监控面板（统计条/类型筛选/自动滚动切换） |
+| 监控 | 统一监控面板（系统概览卡片 + 14 种事件类型筛选 + 关键词搜索 + 事件详情面板 + 3 秒轮询） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |
 | 设置 | 模型配置（多 Provider 卡片）+ MCP 服务（手动/在线 npm 安装）+ 技能管理（在线 URL/本地路径/文本安装） |
 

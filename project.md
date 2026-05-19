@@ -1,7 +1,7 @@
 # AgentForge — 项目全景文档
 
-> 版本: 6.0 | 更新: 2026-05-18 | 方法论: STDD
-> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环 + 流式输出 + 消息持久化 + 工具执行 + 协同进化
+> 版本: 6.2 | 更新: 2026-05-19 | 方法论: STDD
+> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环 + 流式输出 + 消息持久化 + 工具执行 + 协同进化 + 统一监控
 
 ---
 
@@ -20,7 +20,7 @@
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
 | 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
-| API 端点 | 55 REST/WebSocket 路由 |
+| API 端点 | 57 REST/WebSocket 路由 |
 | 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
 | 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
 | 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
@@ -110,7 +110,9 @@ AgentForge/
 │   └── infra/
 │       ├── config.py                  # 全局配置管理
 │       ├── logging.py                 # structlog 结构化日志
-│       └── shutdown.py                # 优雅关闭（信号处理）
+│       ├── shutdown.py                # 优雅关闭（信号处理）
+│       ├── persistence.py             # SQLite 消息持久化（WAL 模式三表 + 重启恢复）
+│       └── monitoring.py              # 统一监控系统（5000 事件环形缓冲 + 类型/严重度/会话过滤）
 ├── skills/                            # 技能目录（SKILL.md 格式）
 │   ├── code-review/SKILL.md           # 代码审查技能
 │   └── web-search/SKILL.md            # 网络搜索技能
@@ -441,6 +443,120 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 
 **实现位置**: `agentforge/rlforge/`
 
+### 4.9 流式输出（WebSocket Chunk 协议）
+
+**完整事件序列**:
+```
+用户发送消息
+  → WebSocket {type: "message", sender: "user", content: "..."}
+  → WebSocket {type: "typing", sender_name: "程序员"}
+  → WebSocket {type: "chunk", content: "首"}    ← 逐 token
+  → WebSocket {type: "chunk", content: "先"}    ← 逐 token
+  → ...
+  → WebSocket {type: "message", sender: agent_id, content: "完整回复"}
+```
+
+**前端实现**:
+- 收到 `typing` → 显示 "XXX 正在输入..."
+- 收到 `chunk` → 追加到占位消息，逐 token 渲染
+- 收到最终 `message` → 替换占位消息为完整消息
+- 自动滚动到底部（可手动关闭）
+
+### 4.10 消息持久化（SQLite Write-Through）
+
+**架构**:
+```
+┌────────────────────────────────────────────────┐
+│  PersistenceStore (persistence.py)              │
+│  ├── SQLite WAL 模式（读写并发安全）              │
+│  ├── sessions 表: 会话元数据                     │
+│  ├── messages 表: 消息记录（含 sender/content）   │
+│  ├── agent_configs 表: Agent 配置快照             │
+│  ├── 写入路径: 每条消息即时写入                    │
+│  ├── 读取路径: 启动时全量恢复 + API 查询时读取     │
+│  └── 搜索: FTS5 全文搜索（messages 内容）          │
+└────────────────────────────────────────────────┘
+```
+
+**恢复流程**: 后端启动 → `state.db.restore_all_sessions()` → 重建内存会话/消息/Agent 配置
+
+### 4.11 工具执行闭环（ReAct 循环）
+
+```
+用户提问 → LLM 第 1 次 complete()
+  → 检测 tool_calls？
+    → 有: 执行工具 → 记录 monitor(tool_call) → 结果追加到上下文
+    → LLM 第 2 次 complete()（使用工具结果）
+      → 还有 tool_calls？
+        → 重复（最多 3 轮）
+      → 无: 流式输出最终回复
+    → 无: 流式输出回复
+```
+
+**支持的工具类型**:
+- MCP 工具：通过 MCP 服务器调用（JSON Schema 参数校验）
+- 技能工具：SKILL.md 格式技能的指令注入
+- 内置工具：web_search（DuckDuckGo）
+
+### 4.12 协同进化（Phase 5：RL + Evolution）
+
+**两阶段流程**:
+```
+阶段 1: RL 训练
+  → 指定 Agent 的 RL 配置启动训练
+  → 训练完成 → 提取奖励统计（均值/方差/最大值）
+
+阶段 2: RL 增强的进化
+  → 适应度函数: 60% 人格质量 + 40% RL 对齐度
+  → 运行遗传算法 N 代
+  → Pareto 前沿排名（Top 5 个体）
+  → 写回最优个体人格 → [协同进化人格优化] 标签
+```
+
+**API**: `POST /api/coevolution/start` 或 `POST /api/agents/{id}/coevolution/start`
+
+**实现位置**: `agentforge/server/app.py` → `CoEvolutionRun` 类
+
+### 4.13 统一监控系统
+
+**架构**:
+```
+┌──────────────────────────────────────────────────┐
+│  MonitorStore (monitoring.py)                     │
+│  ├── 5000 事件 deque 环形缓冲（自动淘汰旧事件）     │
+│  ├── 14 种事件类型:                                │
+│  │   system / message / typing / chunk             │
+│  │   tool_call / llm / rag / memory                │
+│  │   rl / evolution / coevolution / persistence    │
+│  │   error / custom                                │
+│  ├── 3 种严重度: info / warning / error             │
+│  ├── 维度过滤: type / severity / session / agent   │
+│  ├── 实时统计: 总量/按类型/按严重度/活跃Agent        │
+│  └── WebSocket 在线数 + 训练状态                    │
+├──────────────────────────────────────────────────┤
+│  监控埋点位置（app.py）:                           │
+│  ├── 用户发消息 → record("message")                │
+│  ├── Agent 打字中 → record("typing")               │
+│  ├── LLM 探测工具 → record("llm")                 │
+│  ├── 工具执行 → record("tool_call")                │
+│  ├── chunk 收集完成 → record("chunk")              │
+│  ├── 消息持久化 → record("persistence")            │
+│  └── 系统启动 → record("system")                   │
+├──────────────────────────────────────────────────┤
+│  前端: MonitorPage.tsx                            │
+│  ├── 系统概览卡片 (Events/WebSocket/Training/统计)  │
+│  ├── 事件类型分布条（颜色编码）                     │
+│  ├── 最近错误提示栏                                │
+│  ├── 事件列表 + 类型筛选 + 关键词搜索 + 自动滚动    │
+│  ├── 事件详情面板（点击展开 payload）               │
+│  └── 3 秒轮询刷新                                 │
+└──────────────────────────────────────────────────┘
+```
+
+**API 端点**:
+- `GET /api/monitor/events` — 事件列表（支持 type/severity/session_id/agent_id/run_id/limit 过滤）
+- `GET /api/monitor/stats` — 系统概览（事件统计 + WebSocket 在线数 + 训练状态）
+
 ---
 
 ## 5. API 端点大全
@@ -533,6 +649,28 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | GET | `/api/rl/{id}` | 查询训练状态（含逐步日志） |
 | POST | `/api/rl/{id}/cancel` | 取消训练 |
 
+### 5.9 协同进化
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/coevolution/start` | 启动全局协同进化 |
+| POST | `/api/agents/{id}/coevolution/start` | 启动 per-agent 协同进化 |
+| GET | `/api/coevolution/{id}` | 查询协同进化状态（Pareto 前沿 + 双阶段进度） |
+| POST | `/api/coevolution/{id}/cancel` | 取消协同进化 |
+
+### 5.10 监控系统
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/monitor/events` | 事件列表（支持 type/severity/session_id/agent_id/run_id/limit 过滤） |
+| GET | `/api/monitor/stats` | 系统概览（事件统计 + WebSocket 在线数 + 训练状态 + Agents/Sessions/Messages） |
+
+### 5.11 消息搜索
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/messages/search` | 全文搜索消息（?q=关键词&session_id=&limit=） |
+
 ---
 
 ## 6. 前端页面
@@ -541,7 +679,7 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 |-----|----------|
 | **对话** | 会话列表（单聊/群聊切换）+ 消息面板 + WebSocket 实时通信。现代 IM 风格 UI：渐变圆形头像（12 种角色配色）、Per-Agent 独立色调气泡、完整 Markdown 渲染（标题/代码块/表格/列表/引用）+ LaTeX 公式（KaTeX 行内 `$...$` / 块级 `$$...$$`）+ 代码语法高亮（highlight.js）。@提及仅展示当前会话成员（非全局 Agent）。群聊成员管理：点击群标识弹出成员面板，支持查看成员、邀请新成员、移出成员（类微信群交互）。启动自带"AI 专家团队"群聊（10 个预设角色）。支持删除会话（带确认）、导出聊天记录 |
 | **智能体** | 卡片式管理。创建时一步配齐 LLM Provider/Model + 技能 + MCP + 进化参数 + RL 参数。渐变头像、能力徽章、per-agent 配置。详情弹窗支持下载 JSON 空模板 + 上传知识文件到 Milvus 专属 collection。点击跳转对话 |
-| **监控** | 消息流监控面板。统计条（消息总数/Agent 分布）、类型筛选、自动滚动切换 |
+| **监控** | 统一监控面板。系统概览卡片（事件数/WebSocket 在线/训练状态/Agents/Sessions/Messages）+ 事件类型分布条 + 最近错误栏 + 事件列表（14 种类型筛选/关键词搜索/自动滚动）+ 点击查看事件详情（完整 payload） |
 | **仪表盘** | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 + LTTB 大数据降采样 |
 | **设置** | 多 Provider LLM 卡片（启动自动创建默认卡片）+ MCP 服务（手动 + 在线 npm 安装）+ 技能管理（在线 URL + 路径 + 文本安装） |
 
@@ -776,13 +914,13 @@ interface RLRun {
 | 后端测试 | 298 passed / 0 failed / 9 skipped |
 | 后端测试文件 | 29（19 unit + 6 integration + 4 e2e） |
 | 前端测试 | 47 vitest 全部通过 |
-| API 端点 | 55 REST/WebSocket 路由 |
+| API 端点 | 57 REST/WebSocket 路由 |
 | 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
 | 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
 | 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
 | 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
-| 后端 LOC | 8,235 行（不含 __init__.py） |
-| 前端 LOC | 4,656 行 |
+| 统一监控 | MonitorStore 5000 事件环形缓冲 + 14 种事件类型 + 前端实时面板 + 3 秒轮询 |
+| 前端 LOC | 4,726 行 |
 | 测试 LOC | 5,645 行 |
 
 ---
@@ -857,5 +995,5 @@ curl -X POST localhost:8000/api/skills/install-url -d '{"url": "https://github.c
 
 ---
 
-> 本文档为 AgentForge 项目全景文档，覆盖后端、前端、三个算法引擎、Agentic RAG、技能/工具系统的完整技术细节。
-> 更新时间: 2026-05-18 (v5.0)。
+> 本文档为 AgentForge 项目全景文档，覆盖后端、前端、三个算法引擎、Agentic RAG、技能/工具系统、统一监控的完整技术细节。
+> 更新时间: 2026-05-19 (v6.2)。

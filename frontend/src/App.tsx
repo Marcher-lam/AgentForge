@@ -579,13 +579,7 @@ function AppContent() {
         )}
 
         {tab === 'monitor' && (
-          <MonitorPage
-            messages={monitorMessages}
-            nodes={[]}
-            edges={[]}
-            isPaused={monitorPaused}
-            onTogglePause={() => setMonitorPaused(!monitorPaused)}
-          />
+          <MonitorPage />
         )}
 
         {tab === 'dashboard' && (

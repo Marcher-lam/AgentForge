@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agentforge.agent.llm_agent import LLMAgent
 from agentforge.bus.inprocess import InProcessMessageBus
+from agentforge.infra.monitoring import MonitorStore
 from agentforge.infra.persistence import PersistenceManager
 from agentforge.llm import create_backend
 from agentforge.llm.protocol import LLMBackend, LLMMessage, LLMRequest
@@ -560,6 +561,7 @@ class AppState:
         self.agents: dict[str, LLMAgent] = {}
         self.sessions: list[dict] = []
         self.messages: dict[str, list[dict]] = {}
+        self.monitor = MonitorStore()
         self.db = PersistenceManager()
         self.llm_config: dict = {
             "provider": "openai",
@@ -955,7 +957,7 @@ async def _execute_tool_for_agent(agent, tc) -> str:
         return json.dumps({"error": str(e)})
 
 
-async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevant: bool, memory: MemoryManager | None = None, knowledge: ChromaKnowledgeBase | None = None, chat_memory: ChatMemory | None = None, session_id: str = "", broadcast_fn=None, session_id_for_msg: str = "", agent_id_for_msg: str = "") -> str:
+async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevant: bool, memory: MemoryManager | None = None, knowledge: ChromaKnowledgeBase | None = None, chat_memory: ChatMemory | None = None, session_id: str = "", broadcast_fn=None, session_id_for_msg: str = "", agent_id_for_msg: str = "", monitor: MonitorStore | None = None) -> str:
     """Streaming version of _agent_reply: yields chunks via broadcast_fn, returns full reply."""
     from agentforge.llm.protocol import LLMMessage, LLMRequest
 
@@ -1040,6 +1042,13 @@ async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevan
         collected = []
 
         # Notify frontend that agent is typing
+        if monitor:
+            monitor.record(
+                "typing",
+                {"sender_name": agent.name},
+                session_id=session_id_for_msg,
+                agent_id=agent_id_for_msg,
+            )
         if broadcast_fn:
             await broadcast_fn({
                 "type": "typing",
@@ -1096,6 +1105,20 @@ async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevan
                 temperature=_get_agent_temperature(agent),
                 max_tokens=512 if is_relevant else 64,
             ))
+            if monitor:
+                monitor.record(
+                    "llm",
+                    {
+                        "phase": "tool_probe",
+                        "has_tools": bool(tools),
+                        "tool_calls": len(probe.tool_calls or []),
+                        "finish_reason": probe.finish_reason,
+                        "prompt_tokens": probe.usage.prompt_tokens,
+                        "completion_tokens": probe.usage.completion_tokens,
+                    },
+                    session_id=session_id_for_msg,
+                    agent_id=agent_id_for_msg,
+                )
 
             if not probe.tool_calls:
                 break
@@ -1111,6 +1134,13 @@ async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevan
             for tc in probe.tool_calls:
                 result = await _execute_tool_for_agent(agent, tc)
                 tool_history.append(LLMMessage(role="tool", content=result, tool_call_id=tc.id))
+                if monitor:
+                    monitor.record(
+                        "tool_call",
+                        {"sender_name": agent.name, "tool_name": tc.name, "arguments": tc.arguments, "result": result[:200]},
+                        session_id=session_id_for_msg,
+                        agent_id=agent_id_for_msg,
+                    )
 
                 # Broadcast tool execution event
                 if broadcast_fn:
@@ -1148,6 +1178,13 @@ async def _agent_reply_stream(agent, transcript: str, round_num: int, is_relevan
                 })
 
         reply = "".join(collected).strip()
+        if monitor:
+            monitor.record(
+                "chunk",
+                {"sender_name": agent.name, "chunk_count": len(collected), "chars": len(reply)},
+                session_id=session_id_for_msg,
+                agent_id=agent_id_for_msg,
+            )
         if reply.upper() in ("PASS", "PASS。", "PASS。", "pass"):
             return ""
 
@@ -1224,6 +1261,44 @@ def create_app() -> FastAPI:
     # ── Restore persisted data ────────────────────────────
     state.sessions = state.db.load_sessions()
     state.messages = state.db.load_all_messages()
+    state.monitor.record(
+        "system",
+        {"event": "startup_restore", "sessions": len(state.sessions), "messages": sum(len(v) for v in state.messages.values())},
+    )
+
+    # ── Monitor ───────────────────────────────────────────
+    @app.get("/api/monitor/events")
+    async def list_monitor_events(
+        type: str = "",
+        severity: str = "",
+        session_id: str = "",
+        agent_id: str = "",
+        run_id: str = "",
+        limit: int = 200,
+    ) -> dict:
+        events = state.monitor.list_events(
+            event_type=type or None,
+            severity=severity or None,
+            session_id=session_id or None,
+            agent_id=agent_id or None,
+            run_id=run_id or None,
+            limit=min(max(limit, 1), 1000),
+        )
+        return {"events": events, "total": len(events)}
+
+    @app.get("/api/monitor/stats")
+    async def get_monitor_stats() -> dict:
+        stats = state.monitor.stats()
+        stats["active_websockets"] = len(state.manager.active)
+        stats["sessions"] = len(state.sessions)
+        stats["messages"] = sum(len(v) for v in state.messages.values())
+        stats["agents"] = len(state.agents)
+        stats["running_training"] = {
+            "rl": sum(1 for r in state.rl_runs.values() if r.status == "running"),
+            "evolution": sum(1 for r in state.evolution_runs.values() if r.status == "running"),
+            "coevolution": sum(1 for r in state.coevolution_runs.values() if r.status == "running"),
+        }
+        return stats
 
     # ── Settings ──────────────────────────────────────────
     @app.get("/api/settings")
@@ -2050,6 +2125,12 @@ def create_app() -> FastAPI:
                     }
                     state.messages.setdefault(session_id, []).append(user_msg)
                     _persist_msg(state.db, user_msg)
+                    state.monitor.record(
+                        "message",
+                        {"sender_type": "USER", "sender_name": "You", "chars": len(content)},
+                        session_id=session_id,
+                    )
+                    state.monitor.record("persistence", {"action": "save_message", "sender_type": "USER"}, session_id=session_id)
                     await state.manager.broadcast({"type": "message", "data": user_msg})
 
                     session = next((s for s in state.sessions if s["session_id"] == session_id), None)
@@ -2082,11 +2163,13 @@ def create_app() -> FastAPI:
                             chat_memory=state.chat_memory, session_id=session_id,
                             broadcast_fn=state.manager.broadcast,
                             session_id_for_msg=session_id, agent_id_for_msg=aid,
+                            monitor=state.monitor,
                         )
                         if reply:
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
                             _persist_msg(state.db, agent_msg)
+                            state.monitor.record("message", {"sender_type": "AGENT", "sender_name": agent.name, "chars": len(reply)}, session_id=session_id, agent_id=aid)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
                             state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
@@ -2121,11 +2204,12 @@ def create_app() -> FastAPI:
                             if not agent:
                                 continue
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
+                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid, monitor=state.monitor)
                             if reply:
                                 agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                                 state.messages.setdefault(session_id, []).append(agent_msg)
                                 _persist_msg(state.db, agent_msg)
+                                state.monitor.record("message", {"sender_type": "AGENT", "sender_name": agent.name, "chars": len(reply)}, session_id=session_id, agent_id=aid)
                                 session["last_message"] = agent_msg
                                 session["updated_at"] = _now()
                                 state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
@@ -2180,7 +2264,7 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply_stream(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
+                            reply = await _agent_reply_stream(agent, transcript, round_num, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid, monitor=state.monitor)
 
                             if not reply:
                                 continue
@@ -2188,6 +2272,7 @@ def create_app() -> FastAPI:
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
                             _persist_msg(state.db, agent_msg)
+                            state.monitor.record("message", {"sender_type": "AGENT", "sender_name": agent.name, "chars": len(reply)}, session_id=session_id, agent_id=aid)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
                             state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
@@ -2238,7 +2323,7 @@ def create_app() -> FastAPI:
                                 continue
 
                             transcript = _build_transcript(state.messages.get(session_id, []))
-                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
+                            reply = await _agent_reply_stream(agent, transcript, 0, True, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid, monitor=state.monitor)
 
                             if not reply:
                                 continue
@@ -2246,6 +2331,7 @@ def create_app() -> FastAPI:
                             agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                             state.messages.setdefault(session_id, []).append(agent_msg)
                             _persist_msg(state.db, agent_msg)
+                            state.monitor.record("message", {"sender_type": "AGENT", "sender_name": agent.name, "chars": len(reply)}, session_id=session_id, agent_id=aid)
                             session["last_message"] = agent_msg
                             session["updated_at"] = _now()
                             state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])
@@ -2263,7 +2349,7 @@ def create_app() -> FastAPI:
                             continue
 
                         transcript = _build_transcript(state.messages.get(session_id, []))
-                        reply = await _agent_reply_stream(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid)
+                        reply = await _agent_reply_stream(agent, transcript, 99, False, memory=state.memory, knowledge=state.knowledge, chat_memory=state.chat_memory, session_id=session_id, broadcast_fn=state.manager.broadcast, session_id_for_msg=session_id, agent_id_for_msg=aid, monitor=state.monitor)
 
                         if not reply:
                             continue
@@ -2271,6 +2357,7 @@ def create_app() -> FastAPI:
                         agent_msg = _make_agent_msg(session_id, aid, agent.name, reply)
                         state.messages.setdefault(session_id, []).append(agent_msg)
                         _persist_msg(state.db, agent_msg)
+                        state.monitor.record("message", {"sender_type": "AGENT", "sender_name": agent.name, "chars": len(reply)}, session_id=session_id, agent_id=aid)
                         session["last_message"] = agent_msg
                         session["updated_at"] = _now()
                         state.db.update_session_last_message(session_id, agent_msg, session["updated_at"])

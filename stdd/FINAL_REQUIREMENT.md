@@ -1,7 +1,7 @@
 # FINAL_REQUIREMENT.md — AgentForge 全项目交付文档
 
-> 生成时间: 2026-05-16 | 更新时间: 2026-05-18 (v7) | 方法论: STDD
-> 覆盖: agent-core, evolution-engine, rl-engine, frontend-ui, per-agent-config, skill-system, mcp-management, online-install, dashboard-v2, chat-management, memory-wired, evolution-writeback, agentic-rag, rl-writeback, coevolution, streaming, persistence, tool-execution
+> 生成时间: 2026-05-16 | 更新时间: 2026-05-19 (v8) | 方法论: STDD
+> 覆盖: agent-core, evolution-engine, rl-engine, frontend-ui, per-agent-config, skill-system, mcp-management, online-install, dashboard-v2, chat-management, memory-wired, evolution-writeback, agentic-rag, rl-writeback, coevolution, streaming, persistence, tool-execution, monitoring
 
 ---
 
@@ -16,12 +16,13 @@
 | 进化引擎 | 遗传算法（锦标赛/SBX/高斯变异 + 人格优化） |
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
-| API 端点 | 55 个 REST/WebSocket 路由 |
+| API 端点 | 57 个 REST/WebSocket 路由 |
 | 前端测试 | 47 vitest 全部通过 |
 | 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
 | 消息持久化 | SQLite write-through（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
 | 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
 | 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
+| 统一监控 | MonitorStore 5000 事件环形缓冲 + 14 种事件类型 + 前端实时面板 + 3 秒轮询 |
 | Per-Agent 配置 | LLM/工具/技能/MCP/进化/RL 独立配置 + 多 Provider LLM Profile |
 | 仪表盘 | Agent 卡片网格 + 训练记录左右分栏（日志+图表）+ 图表放大 |
 | 聊天管理 | 删除对话记录 + 群聊（多 Agent 多轮讨论）+ 导出聊天记录（JSON） |
