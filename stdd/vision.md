@@ -142,8 +142,8 @@ Agent 框架 (AgentForge)
 - [x] RL DQN 修复：algo_map 映射正确，训练后自动保存 checkpoint
 - [x] RL 结果写回：训练完成自动提取策略信号写回 system_prompt + LLM 参数（temperature/max_tokens/风格描述）
 - [x] 技术债修复：WebSocket subscribe KeyError、VectorMemory 真实语义 embedding、asyncio/anyio 统一
-- [x] 预设 AI 专家团队：启动自动创建 9 个角色（程序员/哲学家/数学家/ML工程师/DL工程师/RL工程师/C++工程师/推理工程师/前端工程师）+ 群聊会话
-- [x] Agentic RAG：Per-Agent ChromaDB 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索策略
+- [x] 预设 AI 专家团队：启动自动创建 10 个角色（程序员/哲学家/数学家/ML工程师/DL工程师/RL工程师/C++工程师/推理工程师/前端工程师/产品经理）+ 群聊会话
+- [x] Agentic RAG：Per-Agent Milvus 知识库 + fastembed 语义 embedding + 联网搜索 + LLM 自主决策检索策略
 
 ### Phase 5: 协同进化 ✅
 
@@ -183,7 +183,7 @@ Agent 框架 (AgentForge)
 | 进化写回 | 最优基因组映射人格特质到 prompt | ✅ 验证通过 |
 | RL 修复 | DQN 映射正确 + checkpoint 保存 | ✅ 验证通过 |
 | RL 写回 | 训练结果提取策略信号写回 Agent | ✅ 验证通过 |
-| Agentic RAG | ChromaDB + fastembed + 联网搜索 | ✅ 语义检索验证通过 |
+| Agentic RAG | Milvus + fastembed + 联网搜索 | ✅ 语义检索验证通过 |
 | 技术债修复 | WebSocket/VectorMemory/anyio | ✅ 已修复 |
 
 ## 约束与边界

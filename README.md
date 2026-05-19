@@ -81,9 +81,11 @@ AgentForge/
 │   │   ├── registry.py            # 简单工具注册表
 │   │   └── mcp_registry.py        # MCP 工具注册表（JSON Schema 校验）
 │   ├── memory/
+│   │   ├── chat_memory.py          # 时序记忆（Per-session 双轨摘要）
 │   │   ├── short_term.py          # 短期记忆
 │   │   ├── long_term.py           # 长期记忆（SQLite + TTL）
-│   │   ├── vector_memory.py       # 向量记忆（NumPy 余弦相似度）
+│   │   ├── vector_memory.py       # 向量记忆（fastembed 384维语义 embedding）
+│   │   ├── knowledge_base.py      # Milvus 知识库（Per-Agent collection + JSON上传）
 │   │   └── manager.py             # 三层记忆管理器
 │   ├── server/
 │   │   ├── app.py                 # FastAPI 应用（三阶段讨论 + 完整 CRUD）
@@ -92,7 +94,10 @@ AgentForge/
 │   ├── types/
 │   │   ├── config.py              # AgentConfig / LLMOverride / EvolutionConfig / RLConfig / MCPServerConfig
 │   │   ├── errors.py              # 异常类型层级
-│   │   └── message.py             # 消息类型定义
+│   │   ├── message.py             # 消息类型定义
+│   │   ├── memory.py              # 记忆类型（MemoryType / MemoryEntry / SearchResult）
+│   │   ├── protocols.py           # Protocol 接口定义
+│   │   └── state.py               # Agent 状态机（AgentState + 状态转换）
 │   └── infra/
 │       ├── config.py              # 配置管理
 │       ├── logging.py             # 结构化日志
@@ -391,6 +396,15 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 | GET | `/api/knowledge/template` | 下载知识库 JSON 空模板（含字段说明） |
 
 **JSON 上传格式**：用户自行预处理知识为 `documents` 数组，每条包含 `text/content` 与可选 `metadata/source/title/tags`。
+
+### LLM Profile 管理
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/llm-profiles` | 返回所有 Provider 卡片（api_key 打码） |
+| POST | `/api/llm-profiles` | 创建 Provider 卡片 |
+| PUT | `/api/llm-profiles/{id}` | 更新卡片 |
+| DELETE | `/api/llm-profiles/{id}` | 删除卡片 |
 
 ### 工具管理
 

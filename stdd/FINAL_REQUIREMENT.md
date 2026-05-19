@@ -224,7 +224,7 @@
 | change-20260516-oauth2-frontend | OAuth2 Auth | Feature | Approved | 1 |
 | change-20260516-reliable-delivery | Reliable Delivery | Bug Fix | Fixed | 1 |
 
-**规格文件总计**: 25+ BDD Gherkin spec 文件，覆盖 50+ Feature, 150+ Scenario
+**规格文件总计**: 19 BDD Gherkin spec 文件，覆盖 50+ Feature, 150+ Scenario
 
 ---
 

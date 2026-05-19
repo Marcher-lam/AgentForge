@@ -582,6 +582,8 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 | POST | `/api/agents/{id}/knowledge` | 兼容旧接口：上传 texts 数组 |
 | POST | `/api/agents/{id}/knowledge/upload-json` | 上传 JSON 知识文件（用户预处理 documents 格式） |
 | GET | `/api/agents/{id}/knowledge/search` | 语义检索知识（?q=关键词&top_k=5） |
+| GET | `/api/agents/{id}/knowledge/stats` | 查看该 Agent 知识库文档数 |
+| DELETE | `/api/agents/{id}/knowledge` | 删除该 Agent 的 Milvus collection |
 | GET | `/api/knowledge/template` | 下载知识库 JSON 空模板 |
 
 ### 5.3 LLM Profile 管理
@@ -784,7 +786,7 @@ python -m pytest tests/ -v
 
 ## 12. 关键数据结构
 
-### 11.1 消息类型
+### 12.1 消息类型
 
 ```python
 # agentforge/types/message.py
@@ -798,7 +800,7 @@ class Message:
     timestamp: datetime
 ```
 
-### 11.2 Agent 配置
+### 12.2 Agent 配置
 
 ```python
 # agentforge/types/config.py
@@ -839,7 +841,7 @@ class RLConfig:
     seed: int = 42
 ```
 
-### 11.3 LLM Profile
+### 12.3 LLM Profile
 
 ```python
 # agentforge/server/app.py (AppState.llm_profiles)
@@ -855,7 +857,7 @@ class RLConfig:
 }
 ```
 
-### 11.4 前端类型
+### 12.4 前端类型
 
 ```typescript
 // frontend/src/types/api.ts
@@ -927,7 +929,7 @@ interface RLRun {
 | 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
 | 统一监控 | MonitorStore 5000 事件环形缓冲 + 14 种事件类型 + 前端实时面板 + 3 秒轮询 |
 | LLM 批量应用 | Profile 卡片一键应用到多 Agent（选择弹窗 + 全选/单选 + 多模型选择） |
-| 前端 LOC | 4,726 行 |
+| 前端 LOC | 4,864 行 |
 | 测试 LOC | 5,645 行 |
 
 ---
@@ -951,13 +953,11 @@ interface RLRun {
 | PERF-1 | WebSocket 二进制序列化 (JSON→MessagePack) | 跨进程延迟优化 |
 | PERF-2 | Topic Trie 替代线性扫描 | 大量订阅场景性能 |
 | TEST-1 | websocket.py 覆盖率 88%→95% | 补齐测试 |
-| TEST-2 | 前端组件渲染测试修复（18/47 失败） | 测试可靠性 |
 
 ### P2 — 优化项
 
 | ID | 描述 |
 |----|------|
-| Phase 5 | RL + Evolution 协同优化 + 策略编码为基因组 |
 | Phase 6 | 分布式训练 + 端到端加密 + CI/CD |
 | IMPL-2 | OAuth2 认证实现 (PKCE + react-router) |
 
