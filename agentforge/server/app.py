@@ -1317,8 +1317,18 @@ def create_app() -> FastAPI:
     # ── Agents ────────────────────────────────────────────
     @app.get("/api/agents")
     async def list_agents() -> list[dict]:
-        return [
-            {
+        results = []
+        for aid, ag in state.agents.items():
+            cfg = state.agent_configs.get(aid)
+            config_dict = {}
+            if cfg:
+                config_dict = {
+                    "llm": {"provider_profile": cfg.llm.provider_profile, "model": cfg.llm.model} if cfg.llm else None,
+                    "tool_ids": cfg.tool_ids,
+                    "skill_ids": cfg.skill_ids,
+                    "mcp_server_ids": cfg.mcp_server_ids,
+                }
+            results.append({
                 "agent_id": aid,
                 "name": ag.name,
                 "avatar_url": None,
@@ -1326,9 +1336,9 @@ def create_app() -> FastAPI:
                 "last_message_preview": None,
                 "capabilities": ["chat", "tool_use"],
                 "system_prompt": ag.system_prompt,
-            }
-            for aid, ag in state.agents.items()
-        ]
+                "config": config_dict,
+            })
+        return results
 
     @app.post("/api/agents")
     async def create_agent(body: dict) -> dict:
@@ -1427,6 +1437,34 @@ def create_app() -> FastAPI:
         _wire_mcp_tools(new_config.mcp_server_ids, state.mcp_servers, state.tools_registry, agent_tools)
         agent.tools = agent_tools
         return {"status": "ok"}
+
+    @app.post("/api/agents/batch-update-llm")
+    async def batch_update_agent_llm(body: dict) -> dict:
+        agent_ids = body.get("agent_ids", [])
+        profile_id = body.get("provider_profile")
+        model = body.get("model")
+        if not agent_ids or not profile_id:
+            return {"error": "agent_ids and provider_profile required"}
+        profile = state.llm_profiles.get(profile_id)
+        if not profile:
+            return {"error": "profile not found"}
+        updated = 0
+        results = []
+        for aid in agent_ids:
+            if aid not in state.agents:
+                continue
+            cfg = state.agent_configs.get(aid)
+            if not cfg:
+                cfg = AgentConfig()
+            existing = cfg.llm or LLMOverride()
+            existing.provider_profile = profile_id
+            if model:
+                existing.model = model
+            cfg.llm = existing
+            state.agent_configs[aid] = cfg
+            updated += 1
+            results.append({"agent_id": aid, "name": state.agents[aid].name})
+        return {"updated": updated, "agents": results}
 
     @app.post("/api/agents/{agent_id}/evolution/start")
     async def start_agent_evolution(agent_id: str) -> dict:

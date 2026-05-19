@@ -168,12 +168,13 @@ Agent 框架 (AgentForge)
 | 后端导入 | 全模块零错误 | ✅ 通过 |
 | 前端编译 | TypeScript 零错误 | ✅ 通过 |
 | 前端测试 | 47 tests | ✅ 全部通过 |
-| API 端点 | 57 个路由 | ✅ 全部注册 |
+| API 端点 | 58 个路由 | ✅ 全部注册 |
 | 协同进化 | RL→Evo 两阶段 + Pareto 前沿 | ✅ 端到端验证通过 |
 | 流式输出 | chunk + typing + auto-scroll | ✅ 9 chunks 验证通过 |
 | 消息持久化 | SQLite 三表 + 重启恢复 | ✅ 验证通过 |
 | 工具执行 | ReAct loop + tool_call 事件 | ✅ 验证通过 |
 | 统一监控 | MonitorStore + 14 事件类型 + 前端面板 | ✅ 7 种事件类型验证通过 |
+| LLM 批量应用 | Profile 一键应用到多 Agent | ✅ 3 Agent 批量更新验证通过 |
 | OpenClaw 兼容 | SKILL.md 读写 + 门控 | ✅ 通过 |
 | 技能互操作 | 双向零转换 | ✅ 验证通过 |
 | 在线安装 | Skill URL + MCP npm | ✅ 验证通过 |

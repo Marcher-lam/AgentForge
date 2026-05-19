@@ -17,7 +17,7 @@ npx vite --host 0.0.0.0 --port 5173
 | 智能体 | `grid/AgentGrid.tsx` | 卡片式管理 + 创建时一步配齐（LLM/技能/MCP/进化/RL）+ 编辑弹窗 + 下载空模板 + JSON 知识文件上传到 Milvus 专属知识库 |
 | 监控 | `monitor/MonitorPage.tsx` | 统一监控面板（系统概览卡片 + 14 种事件类型 + 关键词搜索 + 事件详情 + 3 秒轮询） |
 | 仪表盘 | `dashboard/DashboardPage.tsx` | Agent 卡片网格 → 点击弹出训练记录（左右分栏：日志+图表）+ 放大按钮 |
-| 设置 | `settings/SettingsPage.tsx` | 模型配置（多 Provider 卡片）/ MCP 服务（手动+在线 npm 安装）/ 技能管理（在线 URL+路径+文本安装） |
+| 设置 | `settings/SettingsPage.tsx` | 模型配置（多 Provider 卡片 + 一键应用到多 Agent）/ MCP 服务（手动+在线 npm 安装）/ 技能管理（在线 URL+路径+文本安装） |
 
 ## 关键依赖
 

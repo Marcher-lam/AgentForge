@@ -1,5 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { LLMProfile, MCPServerSummary } from '../../types/api';
+
+interface AgentItem {
+  agent_id: string;
+  name: string;
+  config?: { llm?: { provider_profile?: string | null; model?: string | null } };
+}
 
 interface SettingsPageProps {
   apiBase: string;
@@ -47,6 +53,14 @@ function LLMConfig({ apiBase }: { apiBase: string }) {
   const [newModel, setNewModel] = useState('');
   const [showAdd, setShowAdd] = useState(false);
 
+  // Apply-to-agents modal state
+  const [applyProfile, setApplyProfile] = useState<LLMProfile | null>(null);
+  const [agents, setAgents] = useState<AgentItem[]>([]);
+  const [selectedAgents, setSelectedAgents] = useState<Set<string>>(new Set());
+  const [applyModel, setApplyModel] = useState('');
+  const [applyMsg, setApplyMsg] = useState('');
+  const [applying, setApplying] = useState(false);
+
   // New profile form
   const [newName, setNewName] = useState('');
   const [newProvider, setNewProvider] = useState('openai');
@@ -61,6 +75,65 @@ function LLMConfig({ apiBase }: { apiBase: string }) {
   };
 
   useEffect(load, [apiBase]);
+
+  const openApplyModal = useCallback(async (profile: LLMProfile) => {
+    setApplyProfile(profile);
+    setApplyModel(profile.models?.[0] || '');
+    setApplyMsg('');
+    setApplying(false);
+    try {
+      const res = await fetch(`${apiBase}/api/agents`);
+      const data = await res.json();
+      setAgents(Array.isArray(data) ? data : []);
+      setSelectedAgents(new Set());
+    } catch {
+      setAgents([]);
+    }
+  }, [apiBase]);
+
+  const toggleAgent = (id: string) => {
+    setSelectedAgents(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedAgents.size === agents.length) {
+      setSelectedAgents(new Set());
+    } else {
+      setSelectedAgents(new Set(agents.map(a => a.agent_id)));
+    }
+  };
+
+  const handleApply = async () => {
+    if (!applyProfile || selectedAgents.size === 0) return;
+    setApplying(true);
+    try {
+      const res = await fetch(`${apiBase}/api/agents/batch-update-llm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_ids: Array.from(selectedAgents),
+          provider_profile: applyProfile.id,
+          model: applyModel || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setApplyMsg(`错误: ${data.error}`);
+      } else {
+        setApplyMsg(`已应用到 ${data.updated} 个智能体`);
+        // Refresh agents to show updated profile
+        const agentRes = await fetch(`${apiBase}/api/agents`);
+        const agentData = await agentRes.json();
+        setAgents(Array.isArray(agentData) ? agentData : []);
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -214,7 +287,8 @@ function LLMConfig({ apiBase }: { apiBase: string }) {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
+                <div className="flex justify-between items-center pt-1">
+                  <button onClick={() => openApplyModal(profile)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">应用到智能体</button>
                   <button onClick={() => handleDelete(profile.id)} className="text-xs text-red-500 hover:text-red-700">删除此 Provider</button>
                 </div>
               </div>
@@ -222,9 +296,73 @@ function LLMConfig({ apiBase }: { apiBase: string }) {
           </div>
         ))}
       </div>
+
+      {/* Apply to agents modal */}
+      {applyProfile && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setApplyProfile(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-[480px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold text-gray-800">应用到智能体</h3>
+                <p className="text-xs text-gray-500">将「{applyProfile.name}」应用到选中的智能体</p>
+              </div>
+              <button onClick={() => setApplyProfile(null)} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+            </div>
+
+            {/* Model selector */}
+            {applyProfile.models && applyProfile.models.length > 1 && (
+              <div className="px-4 pt-3">
+                <label className="block text-xs font-medium text-gray-600 mb-1">选择模型</label>
+                <select value={applyModel} onChange={e => setApplyModel(e.target.value)} className="w-full border rounded px-2 py-1.5 text-sm">
+                  {applyProfile.models.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Agent list */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-1">
+              <div className="flex items-center gap-2 pb-2 border-b mb-2">
+                <input type="checkbox" checked={selectedAgents.size === agents.length && agents.length > 0} onChange={toggleAll} className="rounded" />
+                <span className="text-xs text-gray-500 font-medium">全选 ({agents.length} 个智能体)</span>
+              </div>
+              {agents.map(agent => {
+                const currentProfile = agent.config?.llm?.provider_profile;
+                const isSelected = selectedAgents.has(agent.agent_id);
+                const isCurrent = currentProfile === applyProfile.id;
+                return (
+                  <label key={agent.agent_id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleAgent(agent.agent_id)} className="rounded" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{agent.name}</p>
+                      <p className="text-xs text-gray-400 truncate">
+                        {isCurrent ? '当前: ' + applyProfile.name : currentProfile ? '当前: 其他 Provider' : '当前: 全局配置'}
+                      </p>
+                    </div>
+                    {isCurrent && <span className="text-xs text-green-600 font-medium">已使用</span>}
+                  </label>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t flex justify-between items-center">
+              {applyMsg && <p className={`text-sm ${applyMsg.startsWith('错误') ? 'text-red-600' : 'text-green-600'}`}>{applyMsg}</p>}
+              {!applyMsg && <span />}
+              <div className="flex gap-2">
+                <button onClick={() => setApplyProfile(null)} className="text-sm px-4 py-2 rounded-lg border text-gray-600 hover:bg-gray-50">关闭</button>
+                <button onClick={handleApply} disabled={selectedAgents.size === 0 || applying}
+                  className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-40">
+                  {applying ? '应用中...' : `应用 (${selectedAgents.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 function MCPManager({ apiBase }: { apiBase: string }) {
   const [servers, setServers] = useState<MCPServerSummary[]>([]);
   const [showAdd, setShowAdd] = useState(false);

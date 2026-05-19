@@ -1,7 +1,7 @@
 # AgentForge — 项目全景文档
 
-> 版本: 6.2 | 更新: 2026-05-19 | 方法论: STDD
-> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环 + 流式输出 + 消息持久化 + 工具执行 + 协同进化 + 统一监控
+> 版本: 6.3 | 更新: 2026-05-19 | 方法论: STDD
+> 前后端 + 三个算法引擎 + Agentic RAG + 技能/工具系统 + RL 写回闭环 + 流式输出 + 消息持久化 + 工具执行 + 协同进化 + 统一监控 + LLM Profile 批量应用
 
 ---
 
@@ -20,7 +20,7 @@
 | 技能系统 | SKILL.md 原生格式（OpenClaw / AgentSkills 兼容）+ 在线 URL 安装 |
 | 工具系统 | MCP 协议（JSON Schema 校验）+ npm 在线安装 |
 | 记忆系统 | 双层：ChatMemory(时序摘要) + 向量索引(fastembed 384维)，严格 ≤4400 chars 上下文预算 |
-| API 端点 | 57 REST/WebSocket 路由 |
+| API 端点 | 58 REST/WebSocket 路由 |
 | 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
 | 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
 | 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
@@ -671,6 +671,12 @@ Agent 创建 → 配置 RL 参数 → POST /api/agents/{id}/rl/start
 |------|------|------|
 | GET | `/api/messages/search` | 全文搜索消息（?q=关键词&session_id=&limit=） |
 
+### 5.12 批量操作
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/agents/batch-update-llm` | 批量更新 Agent 的 LLM Profile（指定 agent_ids + provider_profile + model） |
+
 ---
 
 ## 6. 前端页面
@@ -914,12 +920,13 @@ interface RLRun {
 | 后端测试 | 298 passed / 0 failed / 9 skipped |
 | 后端测试文件 | 29（19 unit + 6 integration + 4 e2e） |
 | 前端测试 | 47 vitest 全部通过 |
-| API 端点 | 57 REST/WebSocket 路由 |
+| API 端点 | 58 REST/WebSocket 路由 |
 | 流式输出 | WebSocket chunk 协议 + typing 指示器 + 自动滚动 |
 | 消息持久化 | SQLite write-through 缓存（sessions/messages/agent_configs 三表）+ 重启自动恢复 |
 | 工具执行闭环 | ReAct 循环（LLM tool_calls → 执行 MCP/Skill → 回复），最多 3 轮 |
 | 协同进化 | RL + Evolution 两阶段（RL 训练 → 奖励统计注入进化适应度 → Pareto 前沿排名） |
 | 统一监控 | MonitorStore 5000 事件环形缓冲 + 14 种事件类型 + 前端实时面板 + 3 秒轮询 |
+| LLM 批量应用 | Profile 卡片一键应用到多 Agent（选择弹窗 + 全选/单选 + 多模型选择） |
 | 前端 LOC | 4,726 行 |
 | 测试 LOC | 5,645 行 |
 
@@ -996,4 +1003,4 @@ curl -X POST localhost:8000/api/skills/install-url -d '{"url": "https://github.c
 ---
 
 > 本文档为 AgentForge 项目全景文档，覆盖后端、前端、三个算法引擎、Agentic RAG、技能/工具系统、统一监控的完整技术细节。
-> 更新时间: 2026-05-19 (v6.2)。
+> 更新时间: 2026-05-19 (v6.3)。

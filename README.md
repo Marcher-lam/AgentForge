@@ -470,6 +470,12 @@ curl "localhost:8000/api/agents/{id}/knowledge/stats"
 |------|------|------|
 | GET | `/api/messages/search` | 全文搜索消息（?q=关键词） |
 
+### 批量操作
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/agents/batch-update-llm` | 批量更新 Agent LLM Profile（指定 agent_ids + provider_profile + model） |
+
 ## 测试
 
 ```bash
@@ -491,7 +497,7 @@ cd frontend && npx tsc --noEmit
 | 智能体 | 卡片式管理（创建时一步配齐 LLM/技能/MCP/进化/RL，渐变头像/能力徽章/per-agent 配置），详情弹窗支持下载空模板 + 上传 JSON 知识文件到 Milvus 专属知识库，点击跳转对话 |
 | 监控 | 统一监控面板（系统概览卡片 + 14 种事件类型筛选 + 关键词搜索 + 事件详情面板 + 3 秒轮询） |
 | 仪表盘 | Agent 卡片网格 → 点击弹出训练记录（进化/RL 双 Tab）→ 左日志右图表分栏 + 每图放大按钮 |
-| 设置 | 模型配置（多 Provider 卡片）+ MCP 服务（手动/在线 npm 安装）+ 技能管理（在线 URL/本地路径/文本安装） |
+| 设置 | 模型配置（多 Provider 卡片 + 一键应用到多 Agent）+ MCP 服务（手动/在线 npm 安装）+ 技能管理（在线 URL/本地路径/文本安装） |
 
 ## 环境变量
 
